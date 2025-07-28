@@ -1,0 +1,458 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <audio id="celebrateSound" src="celebrate.mp3" preload="auto"></audio>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Chinese Character Flashcards</title>
+  <style>
+    .medals {
+      position: absolute;
+      top: 10px;
+      left: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      font-size: 48px;
+    }
+    .medals span {
+      display: none;
+    }
+    .medals .show {
+      display: inline;
+    }
+    body {
+      font-family: sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f0f0f0;
+    }
+    .container {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      height: 100vh;
+    }
+    .top-bar {
+      position: absolute;
+      top: 10px;
+      right: 10px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+    }
+    .card {
+      font-size: 120px;
+      padding: 40px;
+      background: white;
+      border-radius: 20px;
+      box-shadow: 0 4px 10px rgba(0,0,0,0.1);
+      margin-bottom: 20px;
+    }
+    .buttons {
+      display: flex;
+      gap: 20px;
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+    button {
+      padding: 10px 20px;
+      font-size: 18px;
+      border: none;
+      border-radius: 8px;
+      cursor: pointer;
+    }
+    #correct { background-color: #4caf50; color: white; }
+    #incorrect { background-color: #f44336; color: white; }
+    #speak { background-color: #2196f3; color: white; }
+    #progressBtn { background-color: #673ab7; color: white; }
+    #reviewBtn { background-color: #ff9800; color: white; display: none; }
+    #undoBtn { background-color: #607d8b; color: white; }
+    #progress { margin-top: 20px; font-size: 16px; }
+    #progressModal {
+      display: none;
+      position: fixed;
+      top: 10%;
+      right: 10%;
+      width: 80%;
+      max-height: 80%;
+      overflow-y: auto;
+      background: white;
+      padding: 20px;
+      border: 2px solid #333;
+      border-radius: 10px;
+      z-index: 100;
+    }
+  </style>
+</head>
+<body>
+  <div class="medals">
+    <span id="bronze">🥉</span>
+    <span id="silver">🥈</span>
+    <span id="gold">🥇</span>
+  </div>
+</div>
+<div class="top-bar">
+    <button id="progressBtn">📊 Progress</button>
+    <button id="reviewBtn">🔁 Review Mode</button>
+  </div>
+  <div class="container">
+    <div class="card" id="character"></div>
+    <div class="buttons">
+      <button id="speak">🔊 Speak</button>
+      <button id="correct">Correct</button>
+      <button id="incorrect">Incorrect</button>
+      <button id="undoBtn">Undo</button>
+    </div>
+    <div id="progress"></div>
+  </div>
+  <div id="progressModal"></div>
+<button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer;">Reset Progress</button>
+
+<script>
+let characters = [];
+
+async function loadCharactersFromCSV() {
+  try {
+    const response = await fetch('vocabulary/Level1.csv');
+	if (!response.ok) throw new Error('HTTP error ' + response.status);
+    const text = await response.text();
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    characters = lines.slice(1); // skip header "Character"
+    pickNextChar(); // ✅ Call it here directly
+  } catch (error) {
+    alert("Failed to load vocabulary CSV.");
+    console.error(error);
+  }
+}
+let progress = JSON.parse(localStorage.getItem('progress') || '{}');
+let history = JSON.parse(localStorage.getItem('history') || '{}');
+let memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
+let currentChar = null;
+let lastAction = null;
+let previousChar = null;
+let reviewMode = false;
+
+function today() {
+  return new Date().toISOString().split('T')[0];
+}
+
+function updateProgress() {
+  // removed duplicate learned declaration
+  const memorizedCount = Object.values(progress).filter(v => v >= 5).length;
+  const reviewBtn = document.getElementById('reviewBtn');
+  reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
+
+  const bronze = document.getElementById('bronze');
+  const silver = document.getElementById('silver');
+  const gold = document.getElementById('gold');
+  let medals = JSON.parse(localStorage.getItem('medals') || '{}');
+
+  if (memorizedCount >= 20 && !medals.bronze) {
+    medals.bronze = true;
+    alert('🎉 Congratulations, you earned a bronze medal for learning 20 characters!');
+}
+if (memorizedCount >= 80 && !medals.silver) {
+    medals.silver = true;
+    alert('🎉 Congratulations, you earned a silver medal for learning 80 characters!');
+}
+if (memorizedCount >= characters.length && !medals.gold) {
+    medals.gold = true;
+    alert(`🎉 Congratulations, you earned a gold medal for learning all ${characters.length} characters!`);
+}
+if (medals.bronze) bronze.classList.add('show');
+if (medals.silver) silver.classList.add('show');
+if (medals.gold) gold.classList.add('show');
+localStorage.setItem('medals', JSON.stringify(medals));
+  //localStorage.setItem('medals', JSON.stringify(medals));
+  //if (medals.bronze) bronze.classList.add('show');
+  //if (medals.silver) silver.classList.add('show');
+  //if (medals.gold) gold.classList.add('show');
+  // removed duplicate learned declaration
+  // removed duplicate memorizedCount declaration
+  // removed duplicate progress text update
+  // removed duplicate reviewBtn visibility update
+}
+
+function showStats() {
+  const modal = document.getElementById('progressModal');
+  modal.innerHTML = '';
+  modal.style.display = 'block';
+
+  const learnedSet = new Set(Object.keys(progress).filter(k => progress[k] > 0));
+  const memorizedList = Object.keys(progress).filter(k => progress[k] >= 5);
+  const incorrectSet = new Set();
+  const todayStr = today();
+  let todayTotal = 0;
+  let todayCorrect = 0;
+
+  for (const date in history) {
+    for (const char in history[date]) {
+      if (history[date][char].correct === 0) incorrectSet.add(char);
+    }
+    if (date === todayStr) {
+      for (const char in history[date]) {
+        todayTotal += history[date][char].total;
+        todayCorrect += history[date][char].correct;
+      }
+    }
+  }
+
+  const allAttemptedSet = new Set();
+  for (const date in history) {
+    for (const char in history[date]) {
+      allAttemptedSet.add(char);
+    }
+  }
+  const neverAsked = characters.filter(c => !allAttemptedSet.has(c));
+
+  const section = (title, chars, colorFunc) => {
+    const wrap = document.createElement('div');
+    const h = document.createElement('h3');
+    const toggle = document.createElement('button');
+    toggle.innerText = 'Show';
+    toggle.style.marginLeft = '10px';
+    const list = document.createElement('div');
+    list.style.display = 'none';
+    list.style.marginBottom = '10px';
+
+    toggle.onclick = () => {
+      const showing = list.style.display === 'block';
+      list.style.display = showing ? 'none' : 'block';
+      toggle.innerText = showing ? 'Show' : 'Hide';
+    };
+
+    h.innerText = `${title} (${chars.length})`;
+    wrap.appendChild(h);
+    wrap.appendChild(toggle);
+    chars.forEach(c => {
+      const span = document.createElement('span');
+      span.innerText = c;
+      span.style.margin = '3px';
+      span.style.fontSize = '24px';
+      span.style.color = colorFunc ? colorFunc(c) : 'black';
+      list.appendChild(span);
+    });
+    wrap.appendChild(list);
+    return wrap;
+  };
+
+  const key = document.createElement('div');
+  key.innerHTML = '<strong>Color Key:</strong><br>' +
+    '<span style="color:rgb(249,160,81)">1</span> ' +
+    '<span style="color:rgb(216,220,0)">2</span> ' +
+    '<span style="color:green">3</span> ' +
+    '<span style="color:blue">4</span> ' +
+    '<span style="color:purple">5+</span>'; 
+  modal.appendChild(key);
+
+  modal.appendChild(section('Memorized', memorizedList, c => {
+    const n = progress[c];
+    if (n >= 5) return 'purple';
+    if (n === 4) return 'blue';
+    if (n === 3) return 'green';
+    if (n === 2) return 'rgb(216,220,0)';
+    return 'rgb(249,160,81)';
+  }));
+
+  const incorrectOnly = [...incorrectSet].filter(c => !(progress[c] > 0));
+  modal.appendChild(section('Answered Incorrect', incorrectOnly, () => 'red'));
+  modal.appendChild(section('Learned At Least Once', [...learnedSet], c => {
+    const n = progress[c];
+    if (n >= 5) return 'purple';
+    if (n === 4) return 'blue';
+    if (n === 3) return 'green';
+    if (n === 2) return 'rgb(216,220,0)';
+    return 'rgb(249,160,81)';
+  }));
+  modal.appendChild(section('Not Yet Asked', neverAsked, null));
+
+  const dailyStats = document.createElement('div');
+  dailyStats.innerHTML = `<h3>Today: ${todayTotal} tested, ${todayCorrect} correct (${(todayCorrect / (todayTotal || 1) * 100).toFixed(1)}%)</h3>`;
+  modal.appendChild(dailyStats);
+
+  const historyTable = document.createElement('table');
+  historyTable.border = '1';
+  historyTable.style.marginTop = '10px';
+  historyTable.innerHTML = '<tr><th>Date</th><th>Tested</th><th>Correct</th><th>%</th></tr>';
+  const dates = Object.keys(history).sort().reverse();
+  dates.forEach(d => {
+    let total = 0, correct = 0;
+    for (const c in history[d]) {
+      total += history[d][c].total;
+      correct += history[d][c].correct;
+    }
+    const row = document.createElement('tr');
+    row.innerHTML = `<td>${d}</td><td>${total}</td><td>${correct}</td><td>${(correct / (total || 1) * 100).toFixed(1)}%</td>`;
+    historyTable.appendChild(row);
+  });
+  modal.appendChild(historyTable);
+
+  const closeBtn = document.createElement('button');
+  closeBtn.innerText = 'Close';
+  closeBtn.style.marginTop = '10px';
+  closeBtn.onclick = () => modal.style.display = 'none';
+  modal.appendChild(closeBtn);
+
+}
+
+function pickNextChar() {
+  checkDailyThreshold();
+  let pool;
+  if (reviewMode) {
+    pool = characters.filter(c => memorized.has(c));
+  } else {
+    pool = characters.filter(c => !memorized.has(c));
+  }
+  const charElem = document.getElementById('character');
+  if (pool.length === 0) {
+    charElem.innerText = '🎓';
+    charElem.style.color = 'black';
+    document.getElementById('progress').innerText = 'Congratulations! You have completed this mode!';
+    return;
+  }
+  previousChar = currentChar;
+  currentChar = pool[Math.floor(Math.random() * pool.length)];
+  charElem.innerText = currentChar;
+
+  let correctTotal = 0;
+  let totalTotal = 0;
+  for (const date in history) {
+    if (history[date][currentChar]) {
+      correctTotal += history[date][currentChar].correct;
+      totalTotal += history[date][currentChar].total;
+    }
+  }
+  let color = 'black';
+  if (totalTotal > 0) {
+    if (correctTotal === totalTotal) color = 'green';
+    else if (correctTotal === 0) color = 'red';
+    else color = 'blue';
+  }
+  charElem.style.color = color;
+  updateProgress();
+}
+
+function recordDaily(char, correct) {
+  checkDailyThreshold();
+  const date = today();
+  if (!history[date]) history[date] = {};
+  if (!history[date][char]) history[date][char] = { correct: 0, total: 0 };
+  history[date][char].total++;
+  if (correct) history[date][char].correct++;
+  localStorage.setItem('history', JSON.stringify(history));
+}
+
+function undoLastAction() {
+  if (!lastAction || !previousChar) return;
+  const { char, correct } = lastAction;
+  const oldValue = progress[char] || 0;
+  if (progress[char]) {
+    if (correct) progress[char]--;
+    if (progress[char] <= 0) delete progress[char];
+  }
+  const date = today();
+  if (history[date] && history[date][char]) {
+    history[date][char].total--;
+    if (correct) history[date][char].correct--;
+    if (history[date][char].total <= 0) delete history[date][char];
+  }
+  localStorage.setItem('progress', JSON.stringify(progress));
+  if (oldValue < 5 && progress[currentChar] >= 5) {
+    const sound = document.getElementById('celebrateSound');
+    if (sound) sound.play();
+    alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
+  }
+  localStorage.setItem('history', JSON.stringify(history));
+  memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
+  currentChar = previousChar;
+  previousChar = null;
+  lastAction = null;
+  const charElem = document.getElementById('character');
+  charElem.innerText = currentChar;
+
+  let correctTotal = 0;
+  let totalTotal = 0;
+  for (const date in history) {
+    if (history[date][currentChar]) {
+      correctTotal += history[date][currentChar].correct;
+      totalTotal += history[date][currentChar].total;
+    }
+  }
+  let color = 'black';
+  if (totalTotal > 0) {
+    if (correctTotal === totalTotal) color = 'green';
+    else if (correctTotal === 0) color = 'red';
+    else color = 'blue';
+  }
+  charElem.style.color = color;
+  updateProgress();
+}
+function speakChar(c) {
+  const audio = new Audio(`audio/${c}.mp3`);
+  audio.onerror = () => {
+    const utter = new SpeechSynthesisUtterance(c);
+    utter.lang = 'zh-CN';
+    window.speechSynthesis.speak(utter);
+  };
+  audio.play();
+}
+
+document.getElementById('correct').addEventListener('click', () => {
+  const oldValue = progress[currentChar] || 0;
+  //const oldValue = progress[currentChar] || 0;
+  progress[currentChar] = oldValue + 1;
+  if (oldValue < 5 && progress[currentChar] >= 5) {
+    alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
+  }
+  if (progress[currentChar] >= 5) memorized.add(currentChar);
+  localStorage.setItem('progress', JSON.stringify(progress));
+  recordDaily(currentChar, true);
+  lastAction = { char: currentChar, correct: true };
+  pickNextChar();
+});
+
+document.getElementById('incorrect').addEventListener('click', () => {
+  recordDaily(currentChar, false);
+  lastAction = { char: currentChar, correct: false };
+  pickNextChar();
+});
+
+document.getElementById('undoBtn').addEventListener('click', undoLastAction);
+document.getElementById('speak').addEventListener('click', () => speakChar(currentChar));
+document.getElementById('reviewBtn').addEventListener('click', () => {
+  reviewMode = !reviewMode;
+  document.getElementById('reviewBtn').innerText = reviewMode ? '📘 Normal Studying' : '🔁 Review Mode';
+  pickNextChar();
+});
+document.getElementById('progressBtn').addEventListener('click', showStats);
+
+function checkDailyThreshold() {
+  const date = today();
+  let total = 0;
+  if (history[date]) {
+    for (const c in history[date]) {
+      total += history[date][c].total;
+    }
+  }
+  if (total === 50 && !localStorage.getItem('dailyPopupShown')) {
+    alert('🎉 You have practiced 50 characters today! Great job!');
+    localStorage.setItem('dailyPopupShown', 'true');
+  }
+}
+
+document.getElementById('resetBtn').addEventListener('click', () => {
+  if (confirm('Are you sure you want to reset all progress?')) {
+    localStorage.removeItem('progress');
+    localStorage.removeItem('history');
+    localStorage.removeItem('medals');
+    localStorage.removeItem('dailyPopupShown');
+    location.reload();
+  }
+});
+
+window.onload = loadCharactersFromCSV;
+</script>
+</body>
+</html>
