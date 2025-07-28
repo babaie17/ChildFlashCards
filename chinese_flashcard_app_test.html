@@ -108,6 +108,9 @@
     <div id="progress"></div>
   </div>
   <div id="progressModal"></div>
+<input type="file" id="importFile" style="display:none" />
+<button onclick="exportProgress()">💾 Export Progress</button>
+<button onclick="document.getElementById('importFile').click()">📂 Import Progress</button>
 <button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer;">Reset Progress</button>
 
 <script>
@@ -442,6 +445,42 @@ function checkDailyThreshold() {
   }
 }
 
+function exportProgress() {
+  const data = {
+    progress,
+    history,
+    medals: JSON.parse(localStorage.getItem('medals') || '{}'),
+  };
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = 'progress_backup.json';
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function importProgress(evt) {
+  const file = evt.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.progress) localStorage.setItem('progress', JSON.stringify(data.progress));
+      if (data.history) localStorage.setItem('history', JSON.stringify(data.history));
+      if (data.medals) localStorage.setItem('medals', JSON.stringify(data.medals));
+      alert('✅ Progress successfully imported.');
+      location.reload();
+    } catch (e) {
+      alert('❌ Failed to import progress.');
+    }
+  };
+  reader.readAsText(file);
+}
+
+document.getElementById('importFile').addEventListener('change', importProgress);
+  
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (confirm('Are you sure you want to reset all progress?')) {
     localStorage.removeItem('progress');
