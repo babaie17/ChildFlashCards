@@ -108,10 +108,12 @@
     <div id="progress"></div>
   </div>
   <div id="progressModal"></div>
+<div style="position:fixed; bottom:70px; right:20px; display:flex; flex-direction:column; gap:10px; align-items: flex-end;">
+  <button onclick="exportProgress()" style="background:#009688; color:white; font-size:16px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; min-width:180px;">💾 Export Progress</button>
+  <button onclick="document.getElementById('importFile').click()" style="background:#3f51b5; color:white; font-size:16px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; min-width:180px;">📂 Import Progress</button>
+</div>
 <input type="file" id="importFile" style="display:none" />
-<button onclick="exportProgress()">💾 Export Progress</button>
-<button onclick="document.getElementById('importFile').click()">📂 Import Progress</button>
-<button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer;">Reset Progress</button>
+<button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; min-width:180px;">Reset Progress</button>
 
 <script>
 let characters = [];
