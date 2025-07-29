@@ -94,6 +94,7 @@
   </div>
 </div>
 <div class="top-bar">
+    <button id="listSelectBtn" style="background:#607d8b; color:white;">📂 Select List</button>
     <button id="progressBtn">📊 Progress</button>
     <button id="reviewBtn">🔁 Review Mode</button>
   </div>
@@ -108,6 +109,11 @@
     <div id="progress"></div>
   </div>
   <div id="progressModal"></div>
+<div id="listModal" style="display:none; position:fixed; top:10%; right:10%; width:80%; max-height:80%; overflow-y:auto; background:white; padding:20px; border:2px solid #333; border-radius:10px; z-index:100;">
+  <h3>Select a Vocabulary List</h3>
+  <ul id="listOptions" style="list-style:none; padding:0;"></ul>
+  <button onclick="document.getElementById('listModal').style.display='none'" style="margin-top:10px;">Close</button>
+</div>
 <div style="position:fixed; bottom:70px; right:20px; display:flex; flex-direction:column; gap:10px; align-items: flex-end;">
   <button onclick="exportProgress()" style="background:#009688; color:white; font-size:16px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; min-width:180px;">💾 Export Progress</button>
   <button onclick="document.getElementById('importFile').click()" style="background:#3f51b5; color:white; font-size:16px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; min-width:180px;">📂 Import Progress</button>
@@ -117,34 +123,49 @@
 
 <script>
 let characters = [];
-
-async function loadCharactersFromCSV() {
-  try {
-    const response = await fetch('vocabulary/Level1.csv');
-	if (!response.ok) throw new Error('HTTP error ' + response.status);
-    const text = await response.text();
-    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-    characters = lines.slice(1); // skip header "Character"
-    pickNextChar(); // ✅ Call it here directly
-  } catch (error) {
-    alert("Failed to load vocabulary CSV.");
-    console.error(error);
-  }
-}
-let progress = JSON.parse(localStorage.getItem('progress') || '{}');
-let history = JSON.parse(localStorage.getItem('history') || '{}');
+let availableLists = [];
+let progress = {};
+let history = {};
 let memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
 let currentChar = null;
 let lastAction = null;
 let previousChar = null;
 let reviewMode = false;
+	
+async function loadCharactersFromCSV(fileName) {
+  try {
+    const response = await fetch(`vocabulary/${fileName}`);
+    if (!response.ok) throw new Error('HTTP error ' + response.status);
+    const text = await response.text();
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
+    characters = lines.slice(1); // skip header
+    pickNextChar(); // ✅ start now
+  } catch (error) {
+    alert("Failed to load vocabulary CSV.");
+    console.error(error);
+  }
+}
 
+
+async function fetchAvailableLists() {
+  try {
+    const response = await fetch('vocabulary/index.json');
+    if (!response.ok) throw new Error('Failed to load vocabulary index.');
+    const data = await response.json();
+    return data; // ["Level1.csv", "Level2.csv", ...]
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+	
 function today() {
   return new Date().toISOString().split('T')[0];
 }
 
 function updateProgress() {
   // removed duplicate learned declaration
+  if (!selectedList) return;
   const memorizedCount = Object.values(progress).filter(v => v >= 5).length;
   const reviewBtn = document.getElementById('reviewBtn');
   reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
@@ -152,7 +173,7 @@ function updateProgress() {
   const bronze = document.getElementById('bronze');
   const silver = document.getElementById('silver');
   const gold = document.getElementById('gold');
-  let medals = JSON.parse(localStorage.getItem('medals') || '{}');
+  let medals = JSON.parse(localStorage.getItem(medalskey) || '{}');
 
   if (memorizedCount >= 20 && !medals.bronze) {
     medals.bronze = true;
@@ -169,7 +190,8 @@ if (memorizedCount >= characters.length && !medals.gold) {
 if (medals.bronze) bronze.classList.add('show');
 if (medals.silver) silver.classList.add('show');
 if (medals.gold) gold.classList.add('show');
-localStorage.setItem('medals', JSON.stringify(medals));
+localStorage.setItem(medalskey, JSON.stringify(medals));
+//localStorage.setItem('medals', JSON.stringify(medals));
   //localStorage.setItem('medals', JSON.stringify(medals));
   //if (medals.bronze) bronze.classList.add('show');
   //if (medals.silver) silver.classList.add('show');
@@ -340,16 +362,18 @@ function pickNextChar() {
 }
 
 function recordDaily(char, correct) {
+  if (!selectedList) return;
   checkDailyThreshold();
   const date = today();
   if (!history[date]) history[date] = {};
   if (!history[date][char]) history[date][char] = { correct: 0, total: 0 };
   history[date][char].total++;
   if (correct) history[date][char].correct++;
-  localStorage.setItem('history', JSON.stringify(history));
+  localStorage.setItem('historykey', JSON.stringify(history));
 }
 
 function undoLastAction() {
+  if (!selectedList) return;
   if (!lastAction || !previousChar) return;
   const { char, correct } = lastAction;
   const oldValue = progress[char] || 0;
@@ -363,13 +387,13 @@ function undoLastAction() {
     if (correct) history[date][char].correct--;
     if (history[date][char].total <= 0) delete history[date][char];
   }
-  localStorage.setItem('progress', JSON.stringify(progress));
+  localStorage.setItem('progresskey', JSON.stringify(progress));
   if (oldValue < 5 && progress[currentChar] >= 5) {
     const sound = document.getElementById('celebrateSound');
     if (sound) sound.play();
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
-  localStorage.setItem('history', JSON.stringify(history));
+  localStorage.setItem('historykey', JSON.stringify(history));
   memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
   currentChar = previousChar;
   previousChar = null;
@@ -412,7 +436,7 @@ document.getElementById('correct').addEventListener('click', () => {
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
   if (progress[currentChar] >= 5) memorized.add(currentChar);
-  localStorage.setItem('progress', JSON.stringify(progress));
+  localStorage.setItem('progresskey', JSON.stringify(progress));
   recordDaily(currentChar, true);
   lastAction = { char: currentChar, correct: true };
   pickNextChar();
@@ -448,52 +472,136 @@ function checkDailyThreshold() {
 }
 
 function exportProgress() {
+  if (!selectedList) {
+    alert("Please select a vocabulary list before exporting.");
+    return;
+  }
+
+  const prefix = selectedList.replace('.csv', '');
   const data = {
-    progress,
-    history,
-    medals: JSON.parse(localStorage.getItem('medals') || '{}'),
+    progress: JSON.parse(localStorage.getItem(`progresskey`) || '{}'),
+    history: JSON.parse(localStorage.getItem(`historykey`) || '{}'),
+    medals: JSON.parse(localStorage.getItem(`medalskey`) || '{}'),
   };
+
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'progress_backup.json';
+  a.download = `${prefix}_progress_backup.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function importProgress(evt) {
+  if (!selectedList) {
+    alert("Please select a vocabulary list before importing.");
+    evt.target.value = ""; // reset file input
+    return;
+  }
+
+  const prefix = selectedList.replace('.csv', '');
   const file = evt.target.files[0];
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.progress) localStorage.setItem('progress', JSON.stringify(data.progress));
-      if (data.history) localStorage.setItem('history', JSON.stringify(data.history));
-      if (data.medals) localStorage.setItem('medals', JSON.stringify(data.medals));
-      alert('✅ Progress successfully imported.');
+      if (data.progress) localStorage.setItem(`progresskey`, JSON.stringify(data.progress));
+      if (data.history) localStorage.setItem(`historykey`, JSON.stringify(data.history));
+      if (data.medals) localStorage.setItem(`medalskey`, JSON.stringify(data.medals));
+
+      alert(`✅ Progress for ${prefix} successfully imported.`);
       location.reload();
     } catch (e) {
-      alert('❌ Failed to import progress.');
+      alert('❌ Failed to import progress. Invalid file format.');
     }
   };
   reader.readAsText(file);
+  evt.target.value = ""; // reset file input for subsequent imports
 }
 
+function selectVocabularyList(fileName) {
+  selectedList = fileName;
+  localStorage.setItem("selectedList", selectedList);
+
+  const prefix = selectedList.replace('.csv','');
+  const progressKey = `${prefix}_progress`;
+  const historyKey = `${prefix}_history`;
+  const medalsKey = `${prefix}_medals`;
+
+  // Reset if data doesn't exist or if list has changed
+  progress = JSON.parse(localStorage.getItem(progressKey) || '{}');
+  history = JSON.parse(localStorage.getItem(historyKey) || '{}');
+  memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
+
+  currentChar = null;
+  lastAction = null;
+  previousChar = null;
+  reviewMode = false;
+
+  ["correct", "incorrect", "undoBtn"].forEach(id => {
+  const btn = document.getElementById(id);
+  btn.disabled = false;
+  btn.style.opacity = 1;
+  });
+
+  // Rewire storage functions to scoped keys
+  updateStorage = () => {
+    localStorage.setItem(progressKey, JSON.stringify(progress));
+    localStorage.setItem(historyKey, JSON.stringify(history));
+  };
+
+  updateMedals = medals => {
+    localStorage.setItem(medalsKey, JSON.stringify(medals));
+  };
+
+  document.getElementById("progressBtn").disabled = false;
+
+  loadCharactersFromCSV(fileName);
+  document.getElementById('listModal').style.display = 'none';
+}
 document.getElementById('importFile').addEventListener('change', importProgress);
   
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (confirm('Are you sure you want to reset all progress?')) {
-    localStorage.removeItem('progress');
-    localStorage.removeItem('history');
-    localStorage.removeItem('medals');
+    localStorage.removeItem(progresskey);
+    localStorage.removeItem(historykey);
+    localStorage.removeItem(medalskey);
     localStorage.removeItem('dailyPopupShown');
     location.reload();
   }
 });
 
-window.onload = loadCharactersFromCSV;
+window.onload = async () => {
+  availableLists = await fetchAvailableLists();
+  document.getElementById("progressBtn").disabled = true;
+  document.getElementById("progressBtn").style.opacity = 0.5;
+  document.getElementById("character").innerText = "📘 Please select a list.";
+
+  ["correct", "incorrect", "undoBtn"].forEach(id => {
+  const btn = document.getElementById(id);
+  btn.disabled = true;
+  btn.style.opacity = 0.5;
+  });
+};
+
+document.getElementById('listSelectBtn').addEventListener('click', () => {
+  const listEl = document.getElementById('listOptions');
+  listEl.innerHTML = '';
+  availableLists.forEach(file => {
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.innerText = file;
+    btn.style.margin = '5px';
+    btn.onclick = () => selectVocabularyList(file);
+    li.appendChild(btn);
+    listEl.appendChild(li);
+  });
+  document.getElementById('listModal').style.display = 'block';
+});
+//window.onload = loadCharactersFromCSV;
 </script>
 </body>
 </html>
