@@ -173,7 +173,7 @@ function updateProgress() {
   const bronze = document.getElementById('bronze');
   const silver = document.getElementById('silver');
   const gold = document.getElementById('gold');
-  let medals = JSON.parse(localStorage.getItem(medalskey) || '{}');
+  let medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
 
   if (memorizedCount >= 20 && !medals.bronze) {
     medals.bronze = true;
@@ -190,7 +190,7 @@ if (memorizedCount >= characters.length && !medals.gold) {
 if (medals.bronze) bronze.classList.add('show');
 if (medals.silver) silver.classList.add('show');
 if (medals.gold) gold.classList.add('show');
-localStorage.setItem(medalskey, JSON.stringify(medals));
+localStorage.setItem(medalsKey, JSON.stringify(medals));
 //localStorage.setItem('medals', JSON.stringify(medals));
   //localStorage.setItem('medals', JSON.stringify(medals));
   //if (medals.bronze) bronze.classList.add('show');
@@ -369,7 +369,7 @@ function recordDaily(char, correct) {
   if (!history[date][char]) history[date][char] = { correct: 0, total: 0 };
   history[date][char].total++;
   if (correct) history[date][char].correct++;
-  localStorage.setItem('historykey', JSON.stringify(history));
+  localStorage.setItem('historyKey', JSON.stringify(history));
 }
 
 function undoLastAction() {
@@ -387,13 +387,13 @@ function undoLastAction() {
     if (correct) history[date][char].correct--;
     if (history[date][char].total <= 0) delete history[date][char];
   }
-  localStorage.setItem('progresskey', JSON.stringify(progress));
+  localStorage.setItem('progressKey', JSON.stringify(progress));
   if (oldValue < 5 && progress[currentChar] >= 5) {
     const sound = document.getElementById('celebrateSound');
     if (sound) sound.play();
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
-  localStorage.setItem('historykey', JSON.stringify(history));
+  localStorage.setItem('historyKey', JSON.stringify(history));
   memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
   currentChar = previousChar;
   previousChar = null;
@@ -436,7 +436,7 @@ document.getElementById('correct').addEventListener('click', () => {
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
   if (progress[currentChar] >= 5) memorized.add(currentChar);
-  localStorage.setItem('progresskey', JSON.stringify(progress));
+  localStorage.setItem('progressKey', JSON.stringify(progress));
   recordDaily(currentChar, true);
   lastAction = { char: currentChar, correct: true };
   pickNextChar();
@@ -479,9 +479,9 @@ function exportProgress() {
 
   const prefix = selectedList.replace('.csv', '');
   const data = {
-    progress: JSON.parse(localStorage.getItem(`progresskey`) || '{}'),
-    history: JSON.parse(localStorage.getItem(`historykey`) || '{}'),
-    medals: JSON.parse(localStorage.getItem(`medalskey`) || '{}'),
+    progress: JSON.parse(localStorage.getItem(`progressKey`) || '{}'),
+    history: JSON.parse(localStorage.getItem(`historyKey`) || '{}'),
+    medals: JSON.parse(localStorage.getItem(`medalsKey`) || '{}'),
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -508,9 +508,9 @@ function importProgress(evt) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.progress) localStorage.setItem(`progresskey`, JSON.stringify(data.progress));
-      if (data.history) localStorage.setItem(`historykey`, JSON.stringify(data.history));
-      if (data.medals) localStorage.setItem(`medalskey`, JSON.stringify(data.medals));
+      if (data.progress) localStorage.setItem(`progressKey`, JSON.stringify(data.progress));
+      if (data.history) localStorage.setItem(`historyKey`, JSON.stringify(data.history));
+      if (data.medals) localStorage.setItem(`medalsKey`, JSON.stringify(data.medals));
 
       alert(`✅ Progress for ${prefix} successfully imported.`);
       location.reload();
@@ -566,9 +566,9 @@ document.getElementById('importFile').addEventListener('change', importProgress)
   
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (confirm('Are you sure you want to reset all progress?')) {
-    localStorage.removeItem(progresskey);
-    localStorage.removeItem(historykey);
-    localStorage.removeItem(medalskey);
+    localStorage.removeItem(progressKey);
+    localStorage.removeItem(historyKey);
+    localStorage.removeItem(medalsKey);
     localStorage.removeItem('dailyPopupShown');
     location.reload();
   }
