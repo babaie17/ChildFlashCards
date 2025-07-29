@@ -131,6 +131,10 @@ let currentChar = null;
 let lastAction = null;
 let previousChar = null;
 let reviewMode = false;
+let prefix = ``;
+let progressKey = ``;
+let historyKey = ``;
+let medalsKey = ``;
 	
 async function loadCharactersFromCSV(fileName) {
   try {
@@ -526,10 +530,10 @@ function selectVocabularyList(fileName) {
   selectedList = fileName;
   localStorage.setItem("selectedList", selectedList);
 
-  const prefix = selectedList.replace('.csv','');
-  const progressKey = `${prefix}_progress`;
-  const historyKey = `${prefix}_history`;
-  const medalsKey = `${prefix}_medals`;
+  prefix = selectedList.replace('.csv','');
+  progressKey = `${prefix}_progress`;
+  historyKey = `${prefix}_history`;
+  medalsKey = `${prefix}_medals`;
 
   // Reset if data doesn't exist or if list has changed
   progress = JSON.parse(localStorage.getItem(progressKey) || '{}');
