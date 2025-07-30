@@ -373,7 +373,7 @@ function recordDaily(char, correct) {
   if (!history[date][char]) history[date][char] = { correct: 0, total: 0 };
   history[date][char].total++;
   if (correct) history[date][char].correct++;
-  localStorage.setItem('historyKey', JSON.stringify(history));
+  localStorage.setItem(historyKey, JSON.stringify(history));
 }
 
 function undoLastAction() {
@@ -391,13 +391,13 @@ function undoLastAction() {
     if (correct) history[date][char].correct--;
     if (history[date][char].total <= 0) delete history[date][char];
   }
-  localStorage.setItem('progressKey', JSON.stringify(progress));
+  localStorage.setItem(progressKey, JSON.stringify(progress));
   if (oldValue < 5 && progress[currentChar] >= 5) {
     const sound = document.getElementById('celebrateSound');
     if (sound) sound.play();
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
-  localStorage.setItem('historyKey', JSON.stringify(history));
+  localStorage.setItem(historyKey, JSON.stringify(history));
   memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
   currentChar = previousChar;
   previousChar = null;
@@ -440,7 +440,7 @@ document.getElementById('correct').addEventListener('click', () => {
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
   if (progress[currentChar] >= 5) memorized.add(currentChar);
-  localStorage.setItem('progressKey', JSON.stringify(progress));
+  localStorage.setItem(progressKey, JSON.stringify(progress));
   recordDaily(currentChar, true);
   lastAction = { char: currentChar, correct: true };
   pickNextChar();
@@ -483,9 +483,9 @@ function exportProgress() {
 
   const prefix = selectedList.replace('.csv', '');
   const data = {
-    progress: JSON.parse(localStorage.getItem(`progressKey`) || '{}'),
-    history: JSON.parse(localStorage.getItem(`historyKey`) || '{}'),
-    medals: JSON.parse(localStorage.getItem(`medalsKey`) || '{}'),
+    progress: JSON.parse(localStorage.getItem(progressKey) || '{}'),
+    history: JSON.parse(localStorage.getItem(historyKey) || '{}'),
+    medals: JSON.parse(localStorage.getItem(medalsKey) || '{}'),
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -512,9 +512,9 @@ function importProgress(evt) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.progress) localStorage.setItem(`progressKey`, JSON.stringify(data.progress));
-      if (data.history) localStorage.setItem(`historyKey`, JSON.stringify(data.history));
-      if (data.medals) localStorage.setItem(`medalsKey`, JSON.stringify(data.medals));
+      if (data.progress) localStorage.setItem(progressKey, JSON.stringify(data.progress));
+      if (data.history) localStorage.setItem(historyKey, JSON.stringify(data.history));
+      if (data.medals) localStorage.setItem(medalsKey, JSON.stringify(data.medals));
 
       alert(`✅ Progress for ${prefix} successfully imported.`);
       location.reload();
