@@ -93,7 +93,7 @@
     <span id="gold">🥇</span>
   </div>
 </div>
-<div id="listNameDisplay" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:20px; font-weight:bold;">
+<div id="listNameDisplay" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:40px; font-weight:bold;">
 </div>
 <div class="top-bar">
     <button id="listSelectBtn" style="background:#607d8b; color:white;">📂 Select List</button>
@@ -558,12 +558,13 @@ function selectVocabularyList(fileName) {
   previousChar = null;
   reviewMode = false;
 
-  ["correct", "incorrect", "undoBtn"].forEach(id => {
+  //enable buttons
+  ["correct", "incorrect", "undoBtn", "speak"].forEach(id => {
   const btn = document.getElementById(id);
   btn.disabled = false;
   btn.style.opacity = 1;
   });
-
+	
   // Rewire storage functions to scoped keys
   updateStorage = () => {
     localStorage.setItem(progressKey, JSON.stringify(progress));
@@ -579,6 +580,7 @@ function selectVocabularyList(fileName) {
   };
 
   document.getElementById("progressBtn").disabled = false;
+  document.getElementById("progressBtn").style.opacity = 1;
 
   loadCharactersFromCSV(fileName);
   document.getElementById('listModal').style.display = 'none';
@@ -601,7 +603,7 @@ window.onload = async () => {
   document.getElementById("progressBtn").style.opacity = 0.5;
   document.getElementById("character").innerText = "📘 Please select a list.";
 
-  ["correct", "incorrect", "undoBtn"].forEach(id => {
+  ["correct", "incorrect", "undoBtn", "speak"].forEach(id => {
   const btn = document.getElementById(id);
   btn.disabled = true;
   btn.style.opacity = 0.5;
