@@ -483,6 +483,7 @@ function exportProgress() {
 
   const prefix = selectedList.replace('.csv', '');
   const data = {
+    listName: prefix, // ✅ store the list name inside the file
     progress: JSON.parse(localStorage.getItem(progressKey) || '{}'),
     history: JSON.parse(localStorage.getItem(historyKey) || '{}'),
     medals: JSON.parse(localStorage.getItem(medalsKey) || '{}'),
@@ -512,6 +513,14 @@ function importProgress(evt) {
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
+	    
+      // ✅ Validate the list name
+      if (!data.listName || data.listName !== prefix) {
+        alert(`❌ This progress file is for "${data.listName || 'UNKNOWN'}", but you selected "${prefix}".`);
+        return;
+      }
+	    
+      // Import progress    
       if (data.progress) localStorage.setItem(progressKey, JSON.stringify(data.progress));
       if (data.history) localStorage.setItem(historyKey, JSON.stringify(data.history));
       if (data.medals) localStorage.setItem(medalsKey, JSON.stringify(data.medals));
@@ -597,10 +606,22 @@ document.getElementById('listSelectBtn').addEventListener('click', () => {
   availableLists.forEach(file => {
     const li = document.createElement('li');
     const btn = document.createElement('button');
-    btn.innerText = file;
+    btn.innerText = file.replace('.csv', '');
     btn.style.margin = '5px';
     btn.onclick = () => selectVocabularyList(file);
     li.appendChild(btn);
+
+    // ✅ Medal display (show all earned medals)
+    const medalSpan = document.createElement('span');
+    medalSpan.style.marginLeft = '10px';
+
+    if (medals.bronze) medalSpan.textContent += '🥉 ';
+    if (medals.silver) medalSpan.textContent += '🥈 ';
+    if (medals.gold) medalSpan.textContent += '🥇';
+
+    if (!medalSpan.textContent.trim()) medalSpan.textContent = '⬜'; // no medals earned
+
+    li.appendChild(medalSpan);
     listEl.appendChild(li);
   });
   document.getElementById('listModal').style.display = 'block';
