@@ -93,6 +93,8 @@
     <span id="gold">🥇</span>
   </div>
 </div>
+<div id="listNameDisplay" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:20px; font-weight:bold;">
+</div>
 <div class="top-bar">
     <button id="listSelectBtn" style="background:#607d8b; color:white;">📂 Select List</button>
     <button id="progressBtn">📊 Progress</button>
@@ -544,6 +546,8 @@ function selectVocabularyList(fileName) {
   historyKey = `${prefix}_history`;
   medalsKey = `${prefix}_medals`;
 
+  document.getElementById('listNameDisplay').innerText = prefix; // Show the list name
+	
   // Reset if data doesn't exist or if list has changed
   progress = JSON.parse(localStorage.getItem(progressKey) || '{}');
   history = JSON.parse(localStorage.getItem(historyKey) || '{}');
@@ -566,6 +570,10 @@ function selectVocabularyList(fileName) {
     localStorage.setItem(historyKey, JSON.stringify(history));
   };
 
+  // Reset medal display
+  document.getElementById('bronze').classList.remove('show');
+  document.getElementById('silver').classList.remove('show');
+  document.getElementById('gold').classList.remove('show');
   updateMedals = medals => {
     localStorage.setItem(medalsKey, JSON.stringify(medals));
   };
