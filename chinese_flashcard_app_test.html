@@ -137,6 +137,7 @@ let prefix = ``;
 let progressKey = ``;
 let historyKey = ``;
 let medalsKey = ``;
+let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
 	
 async function loadCharactersFromCSV(fileName) {
   try {
@@ -247,7 +248,6 @@ function showStats() {
   const todayStr = today();
   let todayTotal = 0;
   let todayCorrect = 0;
-  let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
 
   for (const date in history) {
     for (const char in history[date]) {
