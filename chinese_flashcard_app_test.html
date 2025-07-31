@@ -179,7 +179,7 @@ async function loadCharactersFromCSV(fileName) {
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
 
-    localStorage.setItem(`${prefix}_medals`, JSON.stringify(medals));  
+    localStorage.setItem(medalsKey, JSON.stringify(medals));  
 	  
     pickNextChar();
   } catch (error) {
