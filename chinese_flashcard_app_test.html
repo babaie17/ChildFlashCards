@@ -181,7 +181,10 @@ async function loadCharactersFromCSV(fileName) {
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
 
-    localStorage.setItem(medalsKey, JSON.stringify(medals));  
+    //localStorage.setItem(medalsKey, JSON.stringify(medals));
+    updateMedals = medals => {
+    localStorage.setItem(medalsKey, JSON.stringify(medals));
+    };
 	  
     pickNextChar();
   } catch (error) {
@@ -613,9 +616,7 @@ function selectVocabularyList(fileName) {
   document.getElementById('bronze').classList.remove('show');
   document.getElementById('silver').classList.remove('show');
   document.getElementById('gold').classList.remove('show');
-  updateMedals = medals => {
-    localStorage.setItem(medalsKey, JSON.stringify(medals));
-  };
+ 
 
   document.getElementById("progressBtn").disabled = false;
   document.getElementById("progressBtn").style.opacity = 1;
@@ -623,6 +624,7 @@ function selectVocabularyList(fileName) {
   loadCharactersFromCSV(fileName);
   document.getElementById('listModal').style.display = 'none';
 }
+	
 document.getElementById('importFile').addEventListener('change', importProgress);
   
 document.getElementById('resetBtn').addEventListener('click', () => {
