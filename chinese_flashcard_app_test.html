@@ -138,7 +138,10 @@ let prefix = ``;
 let progressKey = ``;
 let historyKey = ``;
 let medalsKey = ``;
+let activeCardsKey = ``;
 let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
+let active_cards = [];       // the current working set of cards
+const ACTIVE_CARD_LIMIT = 40;
 	
 async function loadCharactersFromCSV(fileName) {
   try {
@@ -185,6 +188,11 @@ async function loadCharactersFromCSV(fileName) {
     updateMedals = medals => {
     localStorage.setItem(medalsKey, JSON.stringify(medals));
     };
+	  
+    // Filter characters that are NOT memorized
+    const notMemorized = characters.filter(c => !(progress[c] >= 5));
+    // Start active_cards with the first 40 unmemorized characters
+    active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
 	  
     pickNextChar();
   } catch (error) {
@@ -377,13 +385,13 @@ function pickNextChar() {
   if (reviewMode) {
     pool = characters.filter(c => memorized.has(c));
   } else {
-    pool = characters.filter(c => !memorized.has(c));
+    pool = active_cards.length > 0 ? active_cards : characters.filter(c => !memorized.has(c));
   }
   const charElem = document.getElementById('character');
   if (pool.length === 0) {
     charElem.innerText = '🎓';
     charElem.style.color = 'black';
-    document.getElementById('progress').innerText = 'Congratulations! You have completed this mode!';
+    document.getElementById('progress').innerText = 'Congratulations! You have completed this list!';
     return;
   }
   previousChar = currentChar;
@@ -477,12 +485,20 @@ function speakChar(c) {
 
 document.getElementById('correct').addEventListener('click', () => {
   const oldValue = progress[currentChar] || 0;
-  //const oldValue = progress[currentChar] || 0;
   progress[currentChar] = oldValue + 1;
   if (oldValue < 5 && progress[currentChar] >= 5) {
+    memorized.add(currentChar);
+    // Remove from active_cards
+    active_cards = active_cards.filter(c => c !== currentChar);
+    // Add a new one from the non-active pool if available
+    const notMemorized = characters.filter(c => !(progress[c] >= 5) && !active_cards.includes(c));
+    if (notMemorized.length > 0 && active_cards.length < ACTIVE_CARD_LIMIT) {
+      active_cards.push(notMemorized[0]); // add next card
+    }
+    localStorage.setItem(activeCardsKey, JSON.stringify(active_cards));
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
-  if (progress[currentChar] >= 5) memorized.add(currentChar);
+
   localStorage.setItem(progressKey, JSON.stringify(progress));
   recordDaily(currentChar, true);
   lastAction = { char: currentChar, correct: true };
@@ -530,6 +546,7 @@ function exportProgress() {
     progress: JSON.parse(localStorage.getItem(progressKey) || '{}'),
     history: JSON.parse(localStorage.getItem(historyKey) || '{}'),
     medals: JSON.parse(localStorage.getItem(medalsKey) || '{}'),
+    active_cards: JSON.parse(localStorage.getItem(activeCardsKey) || '[]'),
   };
 
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
@@ -567,6 +584,7 @@ function importProgress(evt) {
       if (data.progress) localStorage.setItem(progressKey, JSON.stringify(data.progress));
       if (data.history) localStorage.setItem(historyKey, JSON.stringify(data.history));
       if (data.medals) localStorage.setItem(medalsKey, JSON.stringify(data.medals));
+      if (data.active_cards) localStorage.setItem(activeCardsKey, JSON.stringify(data.active_cards));
 
       alert(`✅ Progress for ${prefix} successfully imported.`);
       location.reload();
@@ -586,6 +604,7 @@ function selectVocabularyList(fileName) {
   progressKey = `${prefix}_progress`;
   historyKey = `${prefix}_history`;
   medalsKey = `${prefix}_medals`;
+  activeCardsKey = `${prefix}_activeCards`;
 
   document.getElementById('listNameDisplay').innerText = prefix; // Show the list name
 	
@@ -593,7 +612,17 @@ function selectVocabularyList(fileName) {
   progress = JSON.parse(localStorage.getItem(progressKey) || '{}');
   history = JSON.parse(localStorage.getItem(historyKey) || '{}');
   memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
+  active_cards = JSON.parse(localStorage.getItem(activeCardsKey) || '[]');
 
+  // If empty, rebuild the initial active_cards
+  if (active_cards.length === 0) {
+    const notMemorized = characters.filter(c => !(progress[c] >= 5));
+    active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
+  }
+
+localStorage.setItem(`${prefix}_active_cards`, JSON.stringify(active_cards))
+	
+	
   currentChar = null;
   lastAction = null;
   previousChar = null;
