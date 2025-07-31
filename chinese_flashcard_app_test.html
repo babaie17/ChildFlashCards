@@ -620,7 +620,7 @@ function selectVocabularyList(fileName) {
     active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
   }
 
-localStorage.setItem(`${prefix}_active_cards`, JSON.stringify(active_cards))
+  localStorage.setItem(activeCardsKey, JSON.stringify(active_cards))
 	
 	
   currentChar = null;
