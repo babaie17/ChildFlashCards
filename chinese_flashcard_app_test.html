@@ -165,7 +165,7 @@ async function loadCharactersFromCSV(fileName) {
         // Normal character row
         characters.push(char);
       } 
-      else if (medal) {
+      if (medal) {
         // Medal threshold row
         const value = parseInt(medal, 10);
         if (!isNaN(value)) medalValues.push(value);
