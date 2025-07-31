@@ -128,6 +128,7 @@ let characters = [];
 let availableLists = [];
 let progress = {};
 let history = {};
+let medals = {};
 let memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
 let currentChar = null;
 let lastAction = null;
@@ -175,6 +176,7 @@ async function loadCharactersFromCSV(fileName) {
     if (medalValues.length >= 2) medalThresholds.silver = medalValues[1];
     if (medalValues.length >= 3) medalThresholds.gold = medalValues[2];
 
+    medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.bronze) {medals.bronze = false;}
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
     if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
@@ -215,7 +217,7 @@ reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
 const bronze = document.getElementById('bronze');
 const silver = document.getElementById('silver');
 const gold = document.getElementById('gold');
-let medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
+//let medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
 
 if (memorizedCount >= medalThresholds.bronze && !medals.bronze) {
   medals.bronze = true;
