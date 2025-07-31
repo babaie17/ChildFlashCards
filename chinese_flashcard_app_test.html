@@ -144,8 +144,36 @@ async function loadCharactersFromCSV(fileName) {
     if (!response.ok) throw new Error('HTTP error ' + response.status);
     const text = await response.text();
     const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-    characters = lines.slice(1); // skip header
-    pickNextChar(); // ✅ start now
+
+    // Reset before loading
+    characters = [];
+    medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default
+
+    const header = lines[0].split(',').map(h => h.trim());
+    const charIndex = header.indexOf('Character');
+    const medalIndex = header.indexOf('Medal');
+    const medalValues = [];
+
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim());
+      const char = cols[charIndex] || '';
+      const medal = cols[medalIndex] || '';
+
+      if (char) {
+        // Normal character row
+        characters.push(char);
+      } 
+      else if (medal) {
+        // Medal threshold row
+        const value = parseInt(medal, 10);
+        if (!isNaN(value)) medalValues.push(value);
+      }
+    }
+    // Assign thresholds based on detected values or fall back to defaults
+    if (medalValues.length >= 1) medalThresholds.bronze = medalValues[0];
+    if (medalValues.length >= 2) medalThresholds.silver = medalValues[1];
+    if (medalValues.length >= 3) medalThresholds.gold = medalValues[2];
+    pickNextChar();
   } catch (error) {
     alert("Failed to load vocabulary CSV.");
     console.error(error);
@@ -170,28 +198,28 @@ function today() {
 }
 
 function updateProgress() {
-  // removed duplicate learned declaration
-  if (!selectedList) return;
-  const memorizedCount = Object.values(progress).filter(v => v >= 5).length;
-  const reviewBtn = document.getElementById('reviewBtn');
-  reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
+// removed duplicate learned declaration
+if (!selectedList) return;
+const memorizedCount = Object.values(progress).filter(v => v >= 5).length;
+const reviewBtn = document.getElementById('reviewBtn');
+reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
 
-  const bronze = document.getElementById('bronze');
-  const silver = document.getElementById('silver');
-  const gold = document.getElementById('gold');
-  let medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
+const bronze = document.getElementById('bronze');
+const silver = document.getElementById('silver');
+const gold = document.getElementById('gold');
+let medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
 
-  if (memorizedCount >= 20 && !medals.bronze) {
-    medals.bronze = true;
-    alert('🎉 Congratulations, you earned a bronze medal for learning 20 characters!');
+if (memorizedCount >= medalThresholds.bronze && !medals.bronze) {
+  medals.bronze = true;
+  alert(`🎉 Bronze medal achieved at ${medalThresholds.bronze} characters!`);
 }
-if (memorizedCount >= 80 && !medals.silver) {
-    medals.silver = true;
-    alert('🎉 Congratulations, you earned a silver medal for learning 80 characters!');
+if (memorizedCount >= medalThresholds.silver && !medals.silver) {
+  medals.silver = true;
+  alert(`🎉 Silver medal achieved at ${medalThresholds.silver} characters!`);
 }
-if (memorizedCount >= characters.length && !medals.gold) {
-    medals.gold = true;
-    alert(`🎉 Congratulations, you earned a gold medal for learning all ${characters.length} characters!`);
+if (memorizedCount >= medalThresholds.gold && !medals.gold) {
+  medals.gold = true;
+  alert(`🎉 Gold medal achieved at ${medalThresholds.gold} characters!`);
 }
 if (medals.bronze) bronze.classList.add('show');
 if (medals.silver) silver.classList.add('show');
@@ -219,6 +247,7 @@ function showStats() {
   const todayStr = today();
   let todayTotal = 0;
   let todayCorrect = 0;
+  let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
 
   for (const date in history) {
     for (const char in history[date]) {
