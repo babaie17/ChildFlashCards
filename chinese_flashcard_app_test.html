@@ -428,7 +428,7 @@ function pickNextChar() {
   } else {
     pool = active_cards.length > 0 ? active_cards : flashcards.filter(f => !memorized.has(f.char));
   }
-  const charElem = document.getElementById('character');
+  const charElem = document.getElementById('cardFront');
   if (pool.length === 0) {
     charElem.innerText = '🎓';
     charElem.style.color = 'black';
@@ -510,7 +510,7 @@ function undoLastAction() {
   currentChar = previousChar;
   previousChar = null;
   lastAction = null;
-  const charElem = document.getElementById('character');
+  const charElem = document.getElementById('cardFront');
   charElem.innerText = currentChar;
 
   let correctTotal = 0;
@@ -733,7 +733,8 @@ window.onload = async () => {
   availableLists = await fetchAvailableLists();
   document.getElementById("progressBtn").disabled = true;
   document.getElementById("progressBtn").style.opacity = 0.5;
-  document.getElementById("character").innerText = "📘 Please select a list.";
+  document.getElementById("cardFront").innerText = "📘 Please select a list.";
+  document.getElementById("cardBack").innerText = "";
 
   ["correct", "incorrect", "undoBtn", "speak"].forEach(id => {
   const btn = document.getElementById(id);
