@@ -440,6 +440,12 @@ function pickNextChar() {
   currentChar = selectedCard.char;
   currentAnswer = selectedCard.answer;
 
+//testing
+console.log("Flashcards:", flashcards);
+console.log("Active cards:", active_cards);
+console.log("Pick pool:", pool);
+console.log("Selected card:", selectedCard);
+	
   document.getElementById('card').classList.remove('flipped');
   document.getElementById('cardFront').innerText = currentChar;
 
