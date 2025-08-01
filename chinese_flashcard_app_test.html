@@ -88,7 +88,7 @@
       align-items: center;
       justify-content: center;
       text-align: center;
-      padding: 10px;
+      padding: 20px;
       /*word-wrap: break-word;*/
       display: flex;
       flex-direction: column;
@@ -105,9 +105,6 @@
     }*/
     .card-back {
       transform: rotateY(180deg);
-      font-size: 24px;
-      text-align: center;
-      padding: 10px;
     }
     .buttons {
       display: flex;
@@ -453,91 +450,92 @@ function showStats() {
 
 function pickNextChar() {
   checkDailyThreshold();
-  let pool;
-  if (reviewMode) {
-    pool = flashcards.filter(f => memorized.has(f.char));
-  } else if (active_cards.length > 0) {
-  pool = flashcards.filter(f => active_cards.includes(f.char)); // ✅ FIX
-} else {
-  pool = flashcards.filter(f => !memorized.has(f.char));
-}
-  const charElem = document.getElementById('cardFront');
-  if (pool.length === 0) {
-    charElem.innerText = '🎓';
-    charElem.style.color = 'black';
-    document.getElementById('progress').innerText = 'Congratulations! You have completed this list!';
-    return;
-  }
-  previousChar = currentChar;
-  const selectedCard = pool[Math.floor(Math.random() * pool.length)];
-  currentChar = selectedCard.char;
-  currentAnswer = selectedCard.answer;
-
   document.getElementById('card').classList.remove('flipped');
+  setTimeout(() => {
+	  let pool;
+	  if (reviewMode) {
+	    pool = flashcards.filter(f => memorized.has(f.char));
+	  } else if (active_cards.length > 0) {
+	  pool = flashcards.filter(f => active_cards.includes(f.char)); // ✅ FIX
+	} else {
+	  pool = flashcards.filter(f => !memorized.has(f.char));
+	}
+	  const charElem = document.getElementById('cardFront');
+	  if (pool.length === 0) {
+	    charElem.innerText = '🎓';
+	    charElem.style.color = 'black';
+	    document.getElementById('progress').innerText = 'Congratulations! You have completed this list!';
+	    return;
+	  }
+	  previousChar = currentChar;
+	  const selectedCard = pool[Math.floor(Math.random() * pool.length)];
+	  currentChar = selectedCard.char;
+	  currentAnswer = selectedCard.answer;
+		
+	// Handle card back based on listType
+	if (listType.toLowerCase() === 'verbal') {
+	  document.getElementById('cardBack').innerText = ''; // no back for verbal
+	} 
+	else if (listType.toLowerCase() === 'textual') {
+	  document.getElementById('cardBack').innerText = currentAnswer;
+	} 
+	else if (listType.toLowerCase() === 'pictorial') {
+	  document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+	}
+		
+	//testing
+	//console.log("Flashcards:", flashcards);
+	//console.log("Active cards:", active_cards);
+	//console.log("Pick pool:", pool);
+	//console.log("Selected card:", selectedCard);
+		
+	  document.getElementById('cardFront').innerText = currentChar;
+	  const frontElem = document.getElementById('cardFront');
+	  if (listType.toLowerCase() === 'verbal') {
+	    frontElem.style.fontSize = '120px';  // Single characters remain big
+	  } else {
+	    frontElem.style.fontSize = '64px';   // Fits words/math properly
+	  }
+	/* handle spanning text
+	  document.querySelector('#cardFront span').innerText = currentChar;
 	
-// Handle card back based on listType
-if (listType.toLowerCase() === 'verbal') {
-  document.getElementById('cardBack').innerText = ''; // no back for verbal
-} 
-else if (listType.toLowerCase() === 'textual') {
-  document.getElementById('cardBack').innerText = currentAnswer;
-} 
-else if (listType.toLowerCase() === 'pictorial') {
-  document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
-}
-	
-//testing
-//console.log("Flashcards:", flashcards);
-//console.log("Active cards:", active_cards);
-//console.log("Pick pool:", pool);
-//console.log("Selected card:", selectedCard);
-	
-  document.getElementById('cardFront').innerText = currentChar;
-  const frontElem = document.getElementById('cardFront');
-  if (listType.toLowerCase() === 'verbal') {
-    frontElem.style.fontSize = '120px';  // Single characters remain big
-  } else {
-    frontElem.style.fontSize = '64px';   // Fits words/math properly
-  }
-/* handle spanning text
-  document.querySelector('#cardFront span').innerText = currentChar;
-
-  if (listType.toLowerCase() === 'textual') {
-    document.querySelector('#cardBack span').innerText = currentAnswer;
-  } else if (listType.toLowerCase() === 'pictorial') {
-    document.querySelector('#cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
-  } else {
-    document.querySelector('#cardBack span').innerText = '';
-  }
-*/
-  const speakBtn = document.getElementById('speak');
-  if (listType.toLowerCase() === 'verbal') {
-    speakBtn.innerText = '🔊 Speak';
-    document.getElementById('cardBack').innerText = ''; // no back
-  } else if (listType.toLowerCase() === 'textual') {
-    speakBtn.innerText = '🔄 Flip';
-    document.getElementById('cardBack').innerText = currentAnswer;
-  } else if (listType.toLowerCase() === 'pictorial') {
-    speakBtn.innerText = '🔄 Flip';
-    document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
-  }
-	
-  let correctTotal = 0;
-  let totalTotal = 0;
-  for (const date in history) {
-    if (history[date][currentChar]) {
-      correctTotal += history[date][currentChar].correct;
-      totalTotal += history[date][currentChar].total;
-    }
-  }
-  let color = 'black';
-  if (totalTotal > 0) {
-    if (correctTotal === totalTotal) color = 'green';
-    else if (correctTotal === 0) color = 'red';
-    else color = 'blue';
-  }
-  charElem.style.color = color;
-  updateProgress();
+	  if (listType.toLowerCase() === 'textual') {
+	    document.querySelector('#cardBack span').innerText = currentAnswer;
+	  } else if (listType.toLowerCase() === 'pictorial') {
+	    document.querySelector('#cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+	  } else {
+	    document.querySelector('#cardBack span').innerText = '';
+	  }
+	*/
+	  const speakBtn = document.getElementById('speak');
+	  if (listType.toLowerCase() === 'verbal') {
+	    speakBtn.innerText = '🔊 Speak';
+	    document.getElementById('cardBack').innerText = ''; // no back
+	  } else if (listType.toLowerCase() === 'textual') {
+	    speakBtn.innerText = '🔄 Flip';
+	    document.getElementById('cardBack').innerText = currentAnswer;
+	  } else if (listType.toLowerCase() === 'pictorial') {
+	    speakBtn.innerText = '🔄 Flip';
+	    document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+	  }
+		
+	  let correctTotal = 0;
+	  let totalTotal = 0;
+	  for (const date in history) {
+	    if (history[date][currentChar]) {
+	      correctTotal += history[date][currentChar].correct;
+	      totalTotal += history[date][currentChar].total;
+	    }
+	  }
+	  let color = 'black';
+	  if (totalTotal > 0) {
+	    if (correctTotal === totalTotal) color = 'green';
+	    else if (correctTotal === 0) color = 'red';
+	    else color = 'blue';
+	  }
+	  charElem.style.color = color;
+	  updateProgress();
+  }, 400); 
 }
 
 function recordDaily(char, correct) {
