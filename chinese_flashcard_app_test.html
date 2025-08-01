@@ -49,6 +49,8 @@
       border-radius: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       margin-bottom: 20px;
+      height: auto;
+      width: max-content;
       /*width: 220px;*/
       /*height: 160px;*/
       /*width: max-content;*/
@@ -64,6 +66,8 @@
       transition: transform 0.6s;
       display: flex;
       flex-direction: column;
+      height: auto;
+      width: max-content;
     }
     .card.flipped .card-inner {
       transform: rotateY(180deg);
@@ -84,7 +88,9 @@
       /*word-wrap: break-word;*/
       display: flex;
       flex-direction: column;
-      overflow: hidden;           /* ✅ prevents text overflow */
+      overflow: hidden;
+      height: auto;
+      width: max-content;
     }  
     .card-front span, .card-back span {
       display: block;
