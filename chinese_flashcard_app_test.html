@@ -71,6 +71,9 @@
       font-size: 120px;
       border-radius: 20px;
       background: white;
+      word-wrap: break-word;
+      text-align: center;
+      padding: 10px;
     }
     .card-back {
       transform: rotateY(180deg);
@@ -220,10 +223,10 @@ async function loadCharactersFromCSV(fileName) {
     if (medalValues.length >= 2) medalThresholds.silver = medalValues[1];
     if (medalValues.length >= 3) medalThresholds.gold = medalValues[2];
 
-    medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
-    if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.bronze) {medals.bronze = false;}
-    if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
-    if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
+    //medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
+    //if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.bronze) {medals.bronze = false;}
+    //if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
+    //if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
 
     //localStorage.setItem(medalsKey, JSON.stringify(medals));
     updateMedals = medals => {
@@ -696,6 +699,11 @@ function selectVocabularyList(fileName) {
   memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
   active_cards = JSON.parse(localStorage.getItem(activeCardsKey) || '[]');
 
+  medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
+  if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.bronze) {medals.bronze = false;}
+  if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
+  if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
+	
   // If empty, rebuild the initial active_cards
   if (active_cards.length === 0) {
     const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5));
