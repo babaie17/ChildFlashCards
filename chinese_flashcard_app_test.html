@@ -50,9 +50,10 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       margin-bottom: 20px;
       /*width: 220px;*/
-      height: 200px;
+      height: 160px;
       width: max-content;
       perspective: 1000px;
+      display: flex;
     }
     .card-inner {
       width: 100%;
@@ -60,6 +61,7 @@
       position: relative;
       transform-style: preserve-3d;
       transition: transform 0.6s;
+      display: flex;
     }
     .card.flipped .card-inner {
       transform: rotateY(180deg);
@@ -78,7 +80,7 @@
       justify-content: center;
       text-align: center;
       padding: 10px;
-      word-wrap: break-word;
+      /*word-wrap: break-word;*/
       overflow: hidden;           /* ✅ prevents text overflow */
     }  
     .card-front span, .card-back span {
@@ -483,7 +485,7 @@ else if (listType.toLowerCase() === 'pictorial') {
   } else {
     frontElem.style.fontSize = '64px';   // Fits words/math properly
   }
-
+/* handle spanning text
   document.querySelector('#cardFront span').innerText = currentChar;
 
   if (listType.toLowerCase() === 'textual') {
@@ -493,7 +495,7 @@ else if (listType.toLowerCase() === 'pictorial') {
   } else {
     document.querySelector('#cardBack span').innerText = '';
   }
-	
+*/
   const speakBtn = document.getElementById('speak');
   if (listType.toLowerCase() === 'verbal') {
     speakBtn.innerText = '🔊 Speak';
