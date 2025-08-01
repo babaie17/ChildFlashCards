@@ -50,6 +50,34 @@
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       margin-bottom: 20px;
     }
+    .card-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s;
+    }
+    .card.flipped .card-inner {
+      transform: rotateY(180deg);
+    }
+    .card-front, .card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 120px;
+      border-radius: 20px;
+      background: white;
+    }
+    .card-back {
+      transform: rotateY(180deg);
+      font-size: 24px;
+      text-align: center;
+      padding: 10px;
+    }
     .buttons {
       display: flex;
       gap: 20px;
@@ -101,7 +129,12 @@
     <button id="reviewBtn">🔁 Review Mode</button>
   </div>
   <div class="container">
-    <div class="card" id="character"></div>
+    <div class="card" id="card">
+      <div class="card-inner" id="cardInner">
+        <div class="card-front" id="cardFront"></div>
+        <div class="card-back" id="cardBack"></div>
+      </div>
+    </div>
     <div class="buttons">
       <button id="speak">🔊 Speak</button>
       <button id="correct">Correct</button>
@@ -124,7 +157,7 @@
 <button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; min-width:180px;">Reset Progress</button>
 
 <script>
-let characters = [];
+//let characters = [];
 let availableLists = [];
 let progress = {};
 let history = {};
@@ -142,6 +175,8 @@ let activeCardsKey = ``;
 let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
 let active_cards = [];       // the current working set of cards
 const ACTIVE_CARD_LIMIT = 40;
+let flashcards = [];        // { char: string, answer: string }
+let listType = 'Verbal';    // Default type for the current list
 	
 async function loadCharactersFromCSV(fileName) {
   try {
@@ -151,22 +186,28 @@ async function loadCharactersFromCSV(fileName) {
     const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
 
     // Reset before loading
-    characters = [];
+    flashcards = [];
     medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default
 
     const header = lines[0].split(',').map(h => h.trim());
     const charIndex = header.indexOf('Character');
+    const typeIndex = header.indexOf('Type');
+    const answerIndex = header.indexOf('Answer');
     const medalIndex = header.indexOf('Medal');
     const medalValues = [];
 
+    // Detect list type from second row
+    const firstRow = lines[1].split(',').map(c => c.trim());
+    listType = firstRow[typeIndex] || 'Verbal';
+	  
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
       const char = cols[charIndex] || '';
+      const answer = cols[answerIndex] || '';
       const medal = cols[medalIndex] || '';
 
       if (char) {
-        // Normal character row
-        characters.push(char);
+        flashcards.push({char, answer});
       } 
       if (medal) {
         // Medal threshold row
@@ -190,7 +231,7 @@ async function loadCharactersFromCSV(fileName) {
     };
 	  
     // Filter characters that are NOT memorized
-    const notMemorized = characters.filter(c => !(progress[c] >= 5));
+    const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5));
     // Start active_cards with the first 40 unmemorized characters
     active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
 	  
@@ -232,15 +273,15 @@ const gold = document.getElementById('gold');
 
 if (memorizedCount >= medalThresholds.bronze && !medals.bronze) {
   medals.bronze = true;
-  alert(`🎉 Bronze medal achieved at ${medalThresholds.bronze} characters!`);
+  alert(`🎉 Bronze medal achieved at ${medalThresholds.bronze} cards!`);
 }
 if (memorizedCount >= medalThresholds.silver && !medals.silver) {
   medals.silver = true;
-  alert(`🎉 Silver medal achieved at ${medalThresholds.silver} characters!`);
+  alert(`🎉 Silver medal achieved at ${medalThresholds.silver} cards!`);
 }
 if (memorizedCount >= medalThresholds.gold && !medals.gold) {
   medals.gold = true;
-  alert(`🎉 Gold medal achieved at ${medalThresholds.gold} characters!`);
+  alert(`🎉 Gold medal achieved at ${medalThresholds.gold} cards!`);
 }
 if (medals.bronze) bronze.classList.add('show');
 if (medals.silver) silver.classList.add('show');
@@ -287,7 +328,7 @@ function showStats() {
       allAttemptedSet.add(char);
     }
   }
-  const neverAsked = characters.filter(c => !allAttemptedSet.has(c));
+  const neverAsked = flashcards.map(f => f.char).filter(c => !allAttemptedSet.has(c));
 
   const section = (title, chars, colorFunc) => {
     const wrap = document.createElement('div');
@@ -383,9 +424,9 @@ function pickNextChar() {
   checkDailyThreshold();
   let pool;
   if (reviewMode) {
-    pool = characters.filter(c => memorized.has(c));
+    pool = flashcards.filter(f => memorized.has(f.char));
   } else {
-    pool = active_cards.length > 0 ? active_cards : characters.filter(c => !memorized.has(c));
+    pool = active_cards.length > 0 ? active_cards : flashcards.filter(f => !memorized.has(f.char));
   }
   const charElem = document.getElementById('character');
   if (pool.length === 0) {
@@ -395,9 +436,25 @@ function pickNextChar() {
     return;
   }
   previousChar = currentChar;
-  currentChar = pool[Math.floor(Math.random() * pool.length)];
-  charElem.innerText = currentChar;
+  const selectedCard = pool[Math.floor(Math.random() * pool.length)];
+  currentChar = selectedCard.char;
+  currentAnswer = selectedCard.answer;
 
+  document.getElementById('card').classList.remove('flipped');
+  document.getElementById('cardFront').innerText = currentChar;
+
+  const speakBtn = document.getElementById('speak');
+  if (listType.toLowerCase() === 'verbal') {
+    speakBtn.innerText = '🔊 Speak';
+    document.getElementById('cardBack').innerText = ''; // no back
+  } else if (listType.toLowerCase() === 'textual') {
+    speakBtn.innerText = '🔄 Flip';
+    document.getElementById('cardBack').innerText = currentAnswer;
+  } else if (listType.toLowerCase() === 'pictorial') {
+    speakBtn.innerText = '🔄 Flip';
+    document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+  }
+	
   let correctTotal = 0;
   let totalTotal = 0;
   for (const date in history) {
@@ -491,7 +548,7 @@ document.getElementById('correct').addEventListener('click', () => {
     // Remove from active_cards
     active_cards = active_cards.filter(c => c !== currentChar);
     // Add a new one from the non-active pool if available
-    const notMemorized = characters.filter(c => !(progress[c] >= 5) && !active_cards.includes(c));
+    const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5) && !active_cards.includes(c));
     if (notMemorized.length > 0 && active_cards.length < ACTIVE_CARD_LIMIT) {
       active_cards.push(notMemorized[0]); // add next card
     }
@@ -512,7 +569,13 @@ document.getElementById('incorrect').addEventListener('click', () => {
 });
 
 document.getElementById('undoBtn').addEventListener('click', undoLastAction);
-document.getElementById('speak').addEventListener('click', () => speakChar(currentChar));
+document.getElementById('speak').addEventListener('click', () => {
+  if (listType.toLowerCase() === 'verbal') {
+    speakChar(currentChar);
+  } else {
+    document.getElementById('card').classList.toggle('flipped');
+  }
+});
 document.getElementById('reviewBtn').addEventListener('click', () => {
   reviewMode = !reviewMode;
   document.getElementById('reviewBtn').innerText = reviewMode ? '📘 Normal Studying' : '🔁 Review Mode';
@@ -529,7 +592,7 @@ function checkDailyThreshold() {
     }
   }
   if (total === 50 && !localStorage.getItem('dailyPopupShown')) {
-    alert('🎉 You have practiced 50 characters today! Great job!');
+    alert('🎉 You have practiced 50 flash cards today! Great job!');
     localStorage.setItem('dailyPopupShown', 'true');
   }
 }
@@ -616,7 +679,7 @@ function selectVocabularyList(fileName) {
 
   // If empty, rebuild the initial active_cards
   if (active_cards.length === 0) {
-    const notMemorized = characters.filter(c => !(progress[c] >= 5));
+    const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5));
     active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
   }
 
