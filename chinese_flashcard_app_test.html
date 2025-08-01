@@ -425,9 +425,11 @@ function pickNextChar() {
   let pool;
   if (reviewMode) {
     pool = flashcards.filter(f => memorized.has(f.char));
-  } else {
-    pool = active_cards.length > 0 ? active_cards : flashcards.filter(f => !memorized.has(f.char));
-  }
+  } else if (active_cards.length > 0) {
+  pool = flashcards.filter(f => active_cards.includes(f.char)); // ✅ FIX
+} else {
+  pool = flashcards.filter(f => !memorized.has(f.char));
+}
   const charElem = document.getElementById('cardFront');
   if (pool.length === 0) {
     charElem.innerText = '🎓';
@@ -452,10 +454,10 @@ else if (listType.toLowerCase() === 'pictorial') {
 }
 	
 //testing
-//console.log("Flashcards:", flashcards);
-//console.log("Active cards:", active_cards);
-//console.log("Pick pool:", pool);
-//console.log("Selected card:", selectedCard);
+console.log("Flashcards:", flashcards);
+console.log("Active cards:", active_cards);
+console.log("Pick pool:", pool);
+console.log("Selected card:", selectedCard);
 	
   document.getElementById('card').classList.remove('flipped');
   document.getElementById('cardFront').innerText = currentChar;
