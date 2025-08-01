@@ -440,11 +440,22 @@ function pickNextChar() {
   currentChar = selectedCard.char;
   currentAnswer = selectedCard.answer;
 
+// Handle card back based on listType
+if (listType.toLowerCase() === 'verbal') {
+  document.getElementById('cardBack').innerText = ''; // no back for verbal
+} 
+else if (listType.toLowerCase() === 'textual') {
+  document.getElementById('cardBack').innerText = currentAnswer;
+} 
+else if (listType.toLowerCase() === 'pictorial') {
+  document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+}
+	
 //testing
-console.log("Flashcards:", flashcards);
-console.log("Active cards:", active_cards);
-console.log("Pick pool:", pool);
-console.log("Selected card:", selectedCard);
+//console.log("Flashcards:", flashcards);
+//console.log("Active cards:", active_cards);
+//console.log("Pick pool:", pool);
+//console.log("Selected card:", selectedCard);
 	
   document.getElementById('card').classList.remove('flipped');
   document.getElementById('cardFront').innerText = currentChar;
