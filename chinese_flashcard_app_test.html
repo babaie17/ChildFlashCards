@@ -462,6 +462,7 @@ function pickNextChar() {
 	}
 	  const charElem = document.getElementById('cardFront');
 	  if (pool.length === 0) {
+	    updateProgress(); // ✅ ensure medals update before returning
 	    charElem.innerText = '🎓';
 	    charElem.style.color = 'black';
 	    document.getElementById('progress').innerText = 'Congratulations! You have completed this list!';
@@ -778,10 +779,11 @@ function selectVocabularyList(fileName) {
   document.getElementById('bronze').classList.remove('show');
   document.getElementById('silver').classList.remove('show');
   document.getElementById('gold').classList.remove('show');
- 
+  updateProgress();
 
   document.getElementById("progressBtn").disabled = false;
   document.getElementById("progressBtn").style.opacity = 1;
+  document.getElementById('progress').innerText = ''; // ✅ reset "Congratulations" message
 
   loadCharactersFromCSV(fileName);
   document.getElementById('listModal').style.display = 'none';
