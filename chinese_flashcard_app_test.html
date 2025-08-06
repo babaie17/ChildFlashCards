@@ -169,6 +169,13 @@
       <button id="incorrect">Incorrect</button>
       <button id="undoBtn">Undo</button>
     </div>
+    <div style="margin-top:10px;">
+      <button id="micBtn" style="background:#ff5722; color:white; font-size:18px; border:none; border-radius:50%; width:54px; height:54px; display:flex; align-items:center; justify-content:center;">
+        <span id="micIcon">🎤</span>
+      </button>
+      <span id="micStatus" style="margin-left:10px;"></span>
+    </div>
+    <div id="micResult" style="margin-top:8px; font-size:20px;"></div>
     <div id="progress"></div>
   </div>
   <div id="progressModal"></div>
@@ -205,6 +212,10 @@ let active_cards = [];       // the current working set of cards
 const ACTIVE_CARD_LIMIT = 40;
 let flashcards = [];        // { char: string, answer: string }
 let listType = 'Verbal';    // Default type for the current list
+let recognition = null;
+let recognizing = false;
+let currentLanguage = 'en-US'; // default, will set from list
+let answerCheckMode = 'verbal'; // default, can add to list config
 	
 async function loadCharactersFromCSV(fileName) {
   try {
@@ -223,10 +234,23 @@ async function loadCharactersFromCSV(fileName) {
     const answerIndex = header.indexOf('Answer');
     const medalIndex = header.indexOf('Medal');
     const medalValues = [];
+    const langIndex = header.indexOf('Language');
+    let languageCode = 'en-US'; // Default
 
     // Detect list type from second row
     const firstRow = lines[1].split(',').map(c => c.trim());
     listType = firstRow[typeIndex] || 'Verbal';
+    answerCheckMode = listType.trim().toLowerCase();
+
+    if (langIndex >= 0) {
+      const languageRow = lines[1].split(',').map(x => x.trim());
+      if (languageRow[langIndex]) {
+        languageCode = languageRow[langIndex];
+      }
+    }
+	  
+    // Set this as a global
+    currentLanguage = languageCode;
 	  
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
@@ -815,6 +839,90 @@ window.onload = async () => {
   });
 };
 
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = currentLanguage;
+
+  recognition.onstart = () => {
+    recognizing = true;
+    document.getElementById('micStatus').innerText = 'Listening...';
+    document.getElementById('micIcon').innerText = '🛑';
+  };
+  recognition.onend = () => {
+    recognizing = false;
+    document.getElementById('micStatus').innerText = '';
+    document.getElementById('micIcon').innerText = '🎤';
+  };
+  recognition.onerror = (e) => {
+    document.getElementById('micStatus').innerText = 'Error: ' + e.error;
+    recognizing = false;
+    document.getElementById('micIcon').innerText = '🎤';
+  };
+} else {
+  document.getElementById('micBtn').style.display = 'none';
+  document.getElementById('micStatus').innerText = 'Speech Recognition not supported';
+}
+
+document.getElementById('micBtn').addEventListener('click', function() {
+  if (!recognition) return;
+  if (!recognizing) {
+    //recognition.lang = currentLanguage; // Always set latest
+    document.getElementById('micResult').innerText = '';
+    recognition.lang = currentLanguage || 'en-US';
+    recognition.start();
+  } else {
+    recognition.stop();
+  }
+});
+
+recognition.onresult = function(event) {
+  let results = event.results[0];
+  let userSaidArr = [];
+  let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
+  answer = answer.trim().toLowerCase();
+
+  // Gather alternatives with confidence
+  for (let i = 0; i < results.length; i++) {
+    let transcript = results[i].transcript.trim().toLowerCase();
+    let confidence = results[i].confidence;
+    userSaidArr.push({ transcript, confidence });
+  }
+
+  // Display all guesses for debugging
+  let debugStr = userSaidArr.map(r => `"${r.transcript}" (${(r.confidence*100).toFixed(1)}%)`).join(", ");
+  document.getElementById('micResult').innerHTML = `You said: ${debugStr}`;
+
+  // Check if any transcript matches the answer at >=90% confidence
+  let correct = userSaidArr.some(r =>
+    (r.transcript === answer) && (r.confidence >= 0.9)
+  );
+
+  showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
+};
+	
+function showSpeechResult(correct, userResult, answer) {
+  if (correct) {
+    document.getElementById('micResult').innerHTML += ' <span style="color:green;font-size:24px;">✔️</span>';
+    setTimeout(() => {
+      document.getElementById('correct').click();
+    }, 1000);
+  } else {
+    document.getElementById('micResult').innerHTML += ' <span style="color:red;font-size:24px;">❌</span>';
+    if (answerCheckMode === 'verbal') {
+      setTimeout(() => speakChar(answer), 1200);
+    } else {
+      setTimeout(() => {
+        document.getElementById('card').classList.add('flipped');
+        speakChar(answer);
+      }, 1200);
+    }
+  }
+}	
+	
 document.getElementById('listSelectBtn').addEventListener('click', () => {
   const listEl = document.getElementById('listOptions');
   listEl.innerHTML = '';
@@ -843,7 +951,7 @@ document.getElementById('listSelectBtn').addEventListener('click', () => {
   });
   document.getElementById('listModal').style.display = 'block';
 });
-//window.onload = loadCharactersFromCSV;
+	
 </script>
 </body>
 </html>
