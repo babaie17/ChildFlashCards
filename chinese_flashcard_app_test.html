@@ -249,8 +249,8 @@ async function loadCharactersFromCSV(fileName) {
       }
     }
 	  
-    // Set this as a global
     currentLanguage = languageCode;
+    if (recognition) recognition.lang = currentLanguage;
 	  
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
