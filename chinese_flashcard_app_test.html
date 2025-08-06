@@ -880,6 +880,15 @@ document.getElementById('micBtn').addEventListener('click', function() {
 });
 
 recognition.onresult = function(event) {
+  /*
+  console.log('Raw speech event:', event);
+
+  // See all alternatives
+  let results = event.results[0];
+  for (let i = 0; i < results.length; i++) {
+    console.log(`Alternative ${i}:`, results[i].transcript, 'Confidence:', results[i].confidence);
+  }
+  */	
   let results = event.results[0];
   let userSaidArr = [];
   let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
