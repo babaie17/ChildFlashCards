@@ -207,6 +207,7 @@ let progressKey = ``;
 let historyKey = ``;
 let medalsKey = ``;
 let activeCardsKey = ``;
+let languagekey = ``;
 let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
 let active_cards = [];       // the current working set of cards
 const ACTIVE_CARD_LIMIT = 40;
@@ -250,6 +251,7 @@ async function loadCharactersFromCSV(fileName) {
     }
 	  
     currentLanguage = languageCode;
+    localStorage.setItem(languageKey, languageCode);
     if (recognition) recognition.lang = currentLanguage;
 	  
     for (let i = 1; i < lines.length; i++) {
@@ -758,6 +760,7 @@ function selectVocabularyList(fileName) {
   historyKey = `${prefix}_history`;
   medalsKey = `${prefix}_medals`;
   activeCardsKey = `${prefix}_activeCards`;
+  languageKey  = `${prefix}_language`;
 
   document.getElementById('listNameDisplay').innerText = prefix; // Show the list name
 	
@@ -872,7 +875,7 @@ document.getElementById('micBtn').addEventListener('click', function() {
   if (!recognizing) {
     //recognition.lang = currentLanguage; // Always set latest
     document.getElementById('micResult').innerText = '';
-    recognition.lang = currentLanguage || 'en-US';
+    recognition.lang = localStorage.getItem(languageKey) || 'en-US';
     recognition.start();
   } else {
     recognition.stop();
