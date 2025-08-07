@@ -625,8 +625,9 @@ function undoLastAction() {
 function speakChar(c) {
   const audio = new Audio(`audio/${c}.mp3`);
   audio.onerror = () => {
+	const ttsLang = localStorage.getItem(languageKey) || 'en-US';
     const utter = new SpeechSynthesisUtterance(c);
-    utter.lang = 'zh-CN';
+    utter.lang = ttsLang;
     window.speechSynthesis.speak(utter);
   };
   audio.play();
@@ -889,7 +890,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 
     // Check if any transcript matches the answer at >=90% confidence
     let correct = userSaidArr.some(r =>
-      (r.transcript === answer) && (r.confidence >= 0.9)
+      (r.transcript.replace(/\s+/g, '').toLowerCase() === answer.replace(/\s+/g, '').toLowerCase()) && (r.confidence >= 0.5)
     );
 
     showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
