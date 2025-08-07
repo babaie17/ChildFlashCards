@@ -851,16 +851,19 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   recognition.lang = currentLanguage;
 
   recognition.onstart = () => {
+	console.log('[SpeechRecognition] STARTED. Lang:', recognition.lang);
     recognizing = true;
     document.getElementById('micStatus').innerText = 'Listening...';
     document.getElementById('micIcon').innerText = '🛑';
   };
   recognition.onend = () => {
+	console.log('[SpeechRecognition] ENDED.');
     recognizing = false;
     document.getElementById('micStatus').innerText = '';
     document.getElementById('micIcon').innerText = '🎤';
   };
   recognition.onerror = (e) => {
+	console.log('[SpeechRecognition] ERROR:', e.error);
     document.getElementById('micStatus').innerText = 'Error: ' + e.error;
     recognizing = false;
     document.getElementById('micIcon').innerText = '🎤';
@@ -892,6 +895,7 @@ recognition.onresult = function(event) {
     console.log(`Alternative ${i}:`, results[i].transcript, 'Confidence:', results[i].confidence);
   }
   */	
+  console.log('[SpeechRecognition] RESULT:', event);
   let results = event.results[0];
   let userSaidArr = [];
   let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
