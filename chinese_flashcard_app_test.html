@@ -868,6 +868,32 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     recognizing = false;
     document.getElementById('micIcon').innerText = '🎤';
   };
+  recognition.onresult = function(event) {
+
+    console.log('[SpeechRecognition] RESULT:', event);
+    let results = event.results[0];
+    let userSaidArr = [];
+    let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
+    answer = answer.trim().toLowerCase();
+
+    // Gather alternatives with confidence
+    for (let i = 0; i < results.length; i++) {
+      let transcript = results[i].transcript.trim().toLowerCase();
+      let confidence = results[i].confidence;
+      userSaidArr.push({ transcript, confidence });
+    }
+
+    // Display all guesses for debugging
+    let debugStr = userSaidArr.map(r => `"${r.transcript}" (${(r.confidence*100).toFixed(1)}%)`).join(", ");
+    document.getElementById('micResult').innerHTML = `You said: ${debugStr}`;
+
+    // Check if any transcript matches the answer at >=90% confidence
+    let correct = userSaidArr.some(r =>
+      (r.transcript === answer) && (r.confidence >= 0.9)
+    );
+
+    showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
+  };
 } else {
   document.getElementById('micBtn').style.display = 'none';
   document.getElementById('micStatus').innerText = 'Speech Recognition not supported';
@@ -884,41 +910,6 @@ document.getElementById('micBtn').addEventListener('click', function() {
     recognition.stop();
   }
 });
-
-recognition.onresult = function(event) {
-  /*
-  console.log('Raw speech event:', event);
-
-  // See all alternatives
-  let results = event.results[0];
-  for (let i = 0; i < results.length; i++) {
-    console.log(`Alternative ${i}:`, results[i].transcript, 'Confidence:', results[i].confidence);
-  }
-  */	
-  console.log('[SpeechRecognition] RESULT:', event);
-  let results = event.results[0];
-  let userSaidArr = [];
-  let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
-  answer = answer.trim().toLowerCase();
-
-  // Gather alternatives with confidence
-  for (let i = 0; i < results.length; i++) {
-    let transcript = results[i].transcript.trim().toLowerCase();
-    let confidence = results[i].confidence;
-    userSaidArr.push({ transcript, confidence });
-  }
-
-  // Display all guesses for debugging
-  let debugStr = userSaidArr.map(r => `"${r.transcript}" (${(r.confidence*100).toFixed(1)}%)`).join(", ");
-  document.getElementById('micResult').innerHTML = `You said: ${debugStr}`;
-
-  // Check if any transcript matches the answer at >=90% confidence
-  let correct = userSaidArr.some(r =>
-    (r.transcript === answer) && (r.confidence >= 0.9)
-  );
-
-  showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
-};
 	
 function showSpeechResult(correct, userResult, answer) {
   if (correct) {
