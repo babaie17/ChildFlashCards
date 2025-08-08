@@ -922,7 +922,7 @@ document.getElementById('micBtn').addEventListener('click', function() {
   if (!recognition) return;
 	document.getElementById('micResult').innerText = '';
     recognition.lang = localStorage.getItem(languageKey) || 'en-US';
-	recognition.maxAlternatives = 5;            // get more guesses
+	recognition.maxAlternatives = 1;            // get more guesses
 	recognition.interimResults = false;         // only finals
   if (!recognizing) {
     recognition.start();
