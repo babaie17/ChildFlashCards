@@ -880,10 +880,14 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     let results = event.results[0];
     let userSaidArr = [];
     let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
-    answer = answer.trim().toLowerCase();
+	  
+    const norm = s => s.normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/[.,?!，。！？\s]/g,''); // strip spaces too
 
-	const norm = s => s.normalize('NFKC').trim().toLowerCase().replace(/[.,?!，。！？]/g,'');
     const expected = norm(answer);
+    const isChinese = (localStorage.getItem(languageKey) || '').toLowerCase().startsWith('zh');
 
     // Gather alternatives with confidence
     for (let i = 0; i < results.length; i++) {
@@ -897,9 +901,15 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     document.getElementById('micResult').innerHTML = `You said: ${debugStr}`;
 
     // Check if any transcript matches the answer at >=90% confidence
-    let correct = userSaidArr.some(r =>
-      (r.transcript.replace(/\s+/g, '').toLowerCase() === expected) && (r.confidence >= 0.5)
-    );
+    let correct = userSaidArr.some(r => {
+      const said = norm(r.transcript);
+      if (isChinese) {
+        // ignore confidence for zh
+        return said === expected;
+      } else {
+        return (said === expected) && (r.confidence >= 0.5);
+      }
+    });
 
     showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
   };
