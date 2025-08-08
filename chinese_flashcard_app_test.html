@@ -253,6 +253,7 @@ async function loadCharactersFromCSV(fileName) {
     currentLanguage = languageCode;
     localStorage.setItem(languageKey, languageCode);
     if (recognition) recognition.lang = currentLanguage;
+
 	  
     for (let i = 1; i < lines.length; i++) {
       const cols = lines[i].split(',').map(c => c.trim());
@@ -863,11 +864,15 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     document.getElementById('micStatus').innerText = '';
     document.getElementById('micIcon').innerText = '🎤';
   };
+  recognition.onnomatch = () => {
+    document.getElementById('micResult').textContent = 'Didn’t catch that—try again closer to the mic.';
+  };
   recognition.onerror = (e) => {
 	console.log('[SpeechRecognition] ERROR:', e.error);
     document.getElementById('micStatus').innerText = 'Error: ' + e.error;
     recognizing = false;
     document.getElementById('micIcon').innerText = '🎤';
+	try { recognition.abort(); } catch {}
   };
   recognition.onresult = function(event) {
 
@@ -876,6 +881,9 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
     let userSaidArr = [];
     let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
     answer = answer.trim().toLowerCase();
+
+	const norm = s => s.normalize('NFKC').trim().toLowerCase().replace(/[.,?!，。！？]/g,'');
+    const expected = norm(answer);
 
     // Gather alternatives with confidence
     for (let i = 0; i < results.length; i++) {
@@ -890,7 +898,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 
     // Check if any transcript matches the answer at >=90% confidence
     let correct = userSaidArr.some(r =>
-      (r.transcript.replace(/\s+/g, '').toLowerCase() === answer.replace(/\s+/g, '').toLowerCase()) && (r.confidence >= 0.5)
+      (r.transcript.replace(/\s+/g, '').toLowerCase() === expected) && (r.confidence >= 0.5)
     );
 
     showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
@@ -902,10 +910,11 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
 
 document.getElementById('micBtn').addEventListener('click', function() {
   if (!recognition) return;
-  if (!recognizing) {
-    //recognition.lang = currentLanguage; // Always set latest
-    document.getElementById('micResult').innerText = '';
+	document.getElementById('micResult').innerText = '';
     recognition.lang = localStorage.getItem(languageKey) || 'en-US';
+	recognition.maxAlternatives = 5;            // get more guesses
+	recognition.interimResults = false;         // only finals
+  if (!recognizing) {
     recognition.start();
   } else {
     recognition.stop();
