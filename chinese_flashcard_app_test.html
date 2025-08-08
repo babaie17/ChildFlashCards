@@ -877,7 +877,7 @@ if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
   recognition.onresult = function(event) {
 
     console.log('[SpeechRecognition] RESULT:', event);
-    let results = event.results[0];
+    let results = event.results[event.resultIndex];
     let userSaidArr = [];
     let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
 	  
