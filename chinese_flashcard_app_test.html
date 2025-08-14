@@ -33,6 +33,7 @@
       align-items: center;
       justify-content: center;
       height: 100vh;
+      gap: 60px;
     }
     .top-bar {
       position: absolute;
@@ -49,6 +50,61 @@
       border-radius: 20px;
       box-shadow: 0 4px 10px rgba(0,0,0,0.1);
       margin-bottom: 20px;
+      height: auto;
+      width: max-content;
+      /*width: 220px;*/
+      /*height: 160px;*/
+      /*width: max-content;*/
+      perspective: 1000px;
+      display: flex;
+      flex-direction: column;
+    }
+    .card-inner {
+      width: 100%;
+      height: 100%;
+      position: relative;
+      transform-style: preserve-3d;
+      transition: transform 0.6s;
+      display: flex;
+      flex-direction: column;
+      height: auto;
+      width: max-content;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+    }
+    .card.flipped .card-inner {
+      transform: rotateY(180deg);
+    }
+    .card-front, .card-back {
+      position: absolute;
+      width: 100%;
+      height: 100%;
+      backface-visibility: hidden;
+      justify-content: center;
+      font-size: 60px;
+      border-radius: 20px;
+      background: white;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 20px;
+      /*word-wrap: break-word;*/
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+      height: auto;
+      width: max-content;
+      flex-wrap: wrap;  
+    }  
+/*    .card-front span, .card-back span {
+      display: block;
+      width: 100%;
+      font-size: inherit;
+      text-align: center;
+    }*/
+    .card-back {
+      transform: rotateY(180deg);
     }
     .buttons {
       display: flex;
@@ -93,21 +149,41 @@
     <span id="gold">🥇</span>
   </div>
 </div>
+<div id="listNameDisplay" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:40px; font-weight:bold;">
+</div>
 <div class="top-bar">
+    <button id="listSelectBtn" style="background:#607d8b; color:white;">📂 Select List</button>
     <button id="progressBtn">📊 Progress</button>
     <button id="reviewBtn">🔁 Review Mode</button>
   </div>
   <div class="container">
-    <div class="card" id="character"></div>
+    <div class="card" id="card">
+      <div class="card-inner" id="cardInner">
+        <div class="card-front" id="cardFront"></div>
+        <div class="card-back" id="cardBack"></div>
+      </div>
+    </div>
     <div class="buttons">
       <button id="speak">🔊 Speak</button>
       <button id="correct">Correct</button>
       <button id="incorrect">Incorrect</button>
       <button id="undoBtn">Undo</button>
     </div>
+    <div style="margin-top:10px;">
+      <button id="micBtn" style="background:#ff5722; color:white; font-size:18px; border:none; border-radius:50%; width:54px; height:54px; display:flex; align-items:center; justify-content:center;">
+        <span id="micIcon">🎤</span>
+      </button>
+      <span id="micStatus" style="margin-left:10px;"></span>
+    </div>
+    <div id="micResult" style="margin-top:8px; font-size:20px;"></div>
     <div id="progress"></div>
   </div>
   <div id="progressModal"></div>
+<div id="listModal" style="display:none; position:fixed; top:10%; right:10%; width:80%; max-height:80%; overflow-y:auto; background:white; padding:20px; border:2px solid #333; border-radius:10px; z-index:100;">
+  <h3>Select a Vocabulary List</h3>
+  <ul id="listOptions" style="list-style:none; padding:0;"></ul>
+  <button onclick="document.getElementById('listModal').style.display='none'" style="margin-top:10px;">Close</button>
+</div>
 <div style="position:fixed; bottom:70px; right:20px; display:flex; flex-direction:column; gap:10px; align-items: flex-end;">
   <button onclick="exportProgress()" style="background:#009688; color:white; font-size:16px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; min-width:180px;">💾 Export Progress</button>
   <button onclick="document.getElementById('importFile').click()" style="background:#3f51b5; color:white; font-size:16px; padding:10px 20px; border:none; border-radius:8px; cursor:pointer; min-width:180px;">📂 Import Progress</button>
@@ -116,60 +192,157 @@
 <button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; min-width:180px;">Reset Progress</button>
 
 <script>
-let characters = [];
-
-async function loadCharactersFromCSV() {
-  try {
-    const response = await fetch('vocabulary/Level1.csv');
-	if (!response.ok) throw new Error('HTTP error ' + response.status);
-    const text = await response.text();
-    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
-    characters = lines.slice(1); // skip header "Character"
-    pickNextChar(); // ✅ Call it here directly
-  } catch (error) {
-    alert("Failed to load vocabulary CSV.");
-    console.error(error);
-  }
-}
-let progress = JSON.parse(localStorage.getItem('progress') || '{}');
-let history = JSON.parse(localStorage.getItem('history') || '{}');
+//let characters = [];
+let availableLists = [];
+let progress = {};
+let history = {};
+let medals = {};
 let memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
 let currentChar = null;
 let lastAction = null;
 let previousChar = null;
 let reviewMode = false;
+let prefix = ``;
+let progressKey = ``;
+let historyKey = ``;
+let medalsKey = ``;
+let activeCardsKey = ``;
+let languageKey = ``;
+let medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default fallback
+let active_cards = [];       // the current working set of cards
+const ACTIVE_CARD_LIMIT = 40;
+let flashcards = [];        // { char: string, answer: string }
+let listType = 'Verbal';    // Default type for the current list
+let recognition = null;
+let recognizing = false;
+let currentLanguage = 'en-US'; // default, will set from list
+let answerCheckMode = 'verbal'; // default, can add to list config
+	
+async function loadCharactersFromCSV(fileName) {
+  try {
+    const response = await fetch(`vocabulary/${fileName}`);
+    if (!response.ok) throw new Error('HTTP error ' + response.status);
+    const text = await response.text();
+    const lines = text.split('\n').map(line => line.trim()).filter(Boolean);
 
+    // Reset before loading
+    flashcards = [];
+    medalThresholds = { bronze: 20, silver: 80, gold: 133 }; // default
+
+    const header = lines[0].split(',').map(h => h.trim());
+    const charIndex = header.indexOf('Character');
+    const typeIndex = header.indexOf('Type');
+    const answerIndex = header.indexOf('Answer');
+    const medalIndex = header.indexOf('Medal');
+    const medalValues = [];
+    const langIndex = header.indexOf('Language');
+    let languageCode = 'en-US'; // Default
+
+    // Detect list type from second row
+    const firstRow = lines[1].split(',').map(c => c.trim());
+    listType = firstRow[typeIndex] || 'Verbal';
+    answerCheckMode = listType.trim().toLowerCase();
+
+    if (langIndex >= 0) {
+      const languageRow = lines[1].split(',').map(x => x.trim());
+      if (languageRow[langIndex]) {
+        languageCode = languageRow[langIndex];
+      }
+    }
+	  
+    currentLanguage = languageCode;
+    localStorage.setItem(languageKey, languageCode);
+    if (recognition) recognition.lang = currentLanguage;
+
+	  
+    for (let i = 1; i < lines.length; i++) {
+      const cols = lines[i].split(',').map(c => c.trim());
+      const char = cols[charIndex] || '';
+      const answer = cols[answerIndex] || '';
+      const medal = cols[medalIndex] || '';
+
+      if (char) {
+        flashcards.push({char, answer});
+      } 
+      if (medal) {
+        // Medal threshold row
+        const value = parseInt(medal, 10);
+        if (!isNaN(value)) medalValues.push(value);
+      }
+    }
+    // Assign thresholds based on detected values or fall back to defaults
+    if (medalValues.length >= 1) medalThresholds.bronze = medalValues[0];
+    if (medalValues.length >= 2) medalThresholds.silver = medalValues[1];
+    if (medalValues.length >= 3) medalThresholds.gold = medalValues[2];
+
+    //medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
+    //if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.bronze) {medals.bronze = false;}
+    //if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
+    //if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
+
+    //localStorage.setItem(medalsKey, JSON.stringify(medals));
+    updateMedals = medals => {
+    localStorage.setItem(medalsKey, JSON.stringify(medals));
+    };
+	  
+    // Filter characters that are NOT memorized
+    const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5));
+    // Start active_cards with the first 40 unmemorized characters
+    active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
+	  
+    pickNextChar();
+  } catch (error) {
+    alert("Failed to load vocabulary CSV.");
+    console.error(error);
+  }
+}
+
+
+async function fetchAvailableLists() {
+  try {
+    const response = await fetch('vocabulary/index.json');
+    if (!response.ok) throw new Error('Failed to load vocabulary index.');
+    const data = await response.json();
+    return data; // ["Level1.csv", "Level2.csv", ...]
+  } catch (err) {
+    console.error(err);
+    return [];
+  }
+}
+	
 function today() {
   return new Date().toISOString().split('T')[0];
 }
 
 function updateProgress() {
-  // removed duplicate learned declaration
-  const memorizedCount = Object.values(progress).filter(v => v >= 5).length;
-  const reviewBtn = document.getElementById('reviewBtn');
-  reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
+// removed duplicate learned declaration
+if (!selectedList) return;
+const memorizedCount = Object.values(progress).filter(v => v >= 5).length;
+const reviewBtn = document.getElementById('reviewBtn');
+reviewBtn.style.display = memorizedCount > 0 ? 'inline-block' : 'none';
 
-  const bronze = document.getElementById('bronze');
-  const silver = document.getElementById('silver');
-  const gold = document.getElementById('gold');
-  let medals = JSON.parse(localStorage.getItem('medals') || '{}');
+const bronze = document.getElementById('bronze');
+const silver = document.getElementById('silver');
+const gold = document.getElementById('gold');
+//let medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
 
-  if (memorizedCount >= 20 && !medals.bronze) {
-    medals.bronze = true;
-    alert('🎉 Congratulations, you earned a bronze medal for learning 20 characters!');
+if (memorizedCount >= medalThresholds.bronze && !medals.bronze) {
+  medals.bronze = true;
+  alert(`🎉 Bronze medal achieved at ${medalThresholds.bronze} cards!`);
 }
-if (memorizedCount >= 80 && !medals.silver) {
-    medals.silver = true;
-    alert('🎉 Congratulations, you earned a silver medal for learning 80 characters!');
+if (memorizedCount >= medalThresholds.silver && !medals.silver) {
+  medals.silver = true;
+  alert(`🎉 Silver medal achieved at ${medalThresholds.silver} cards!`);
 }
-if (memorizedCount >= characters.length && !medals.gold) {
-    medals.gold = true;
-    alert(`🎉 Congratulations, you earned a gold medal for learning all ${characters.length} characters!`);
+if (memorizedCount >= medalThresholds.gold && !medals.gold) {
+  medals.gold = true;
+  alert(`🎉 Gold medal achieved at ${medalThresholds.gold} cards!`);
 }
 if (medals.bronze) bronze.classList.add('show');
 if (medals.silver) silver.classList.add('show');
 if (medals.gold) gold.classList.add('show');
-localStorage.setItem('medals', JSON.stringify(medals));
+localStorage.setItem(medalsKey, JSON.stringify(medals));
+//localStorage.setItem('medals', JSON.stringify(medals));
   //localStorage.setItem('medals', JSON.stringify(medals));
   //if (medals.bronze) bronze.classList.add('show');
   //if (medals.silver) silver.classList.add('show');
@@ -210,7 +383,7 @@ function showStats() {
       allAttemptedSet.add(char);
     }
   }
-  const neverAsked = characters.filter(c => !allAttemptedSet.has(c));
+  const neverAsked = flashcards.map(f => f.char).filter(c => !allAttemptedSet.has(c));
 
   const section = (title, chars, colorFunc) => {
     const wrap = document.createElement('div');
@@ -304,52 +477,108 @@ function showStats() {
 
 function pickNextChar() {
   checkDailyThreshold();
-  let pool;
-  if (reviewMode) {
-    pool = characters.filter(c => memorized.has(c));
-  } else {
-    pool = characters.filter(c => !memorized.has(c));
-  }
-  const charElem = document.getElementById('character');
-  if (pool.length === 0) {
-    charElem.innerText = '🎓';
-    charElem.style.color = 'black';
-    document.getElementById('progress').innerText = 'Congratulations! You have completed this mode!';
-    return;
-  }
-  previousChar = currentChar;
-  currentChar = pool[Math.floor(Math.random() * pool.length)];
-  charElem.innerText = currentChar;
-
-  let correctTotal = 0;
-  let totalTotal = 0;
-  for (const date in history) {
-    if (history[date][currentChar]) {
-      correctTotal += history[date][currentChar].correct;
-      totalTotal += history[date][currentChar].total;
-    }
-  }
-  let color = 'black';
-  if (totalTotal > 0) {
-    if (correctTotal === totalTotal) color = 'green';
-    else if (correctTotal === 0) color = 'red';
-    else color = 'blue';
-  }
-  charElem.style.color = color;
-  updateProgress();
+  document.getElementById('card').classList.remove('flipped');
+  setTimeout(() => {
+	  let pool;
+	  if (reviewMode) {
+	    pool = flashcards.filter(f => memorized.has(f.char));
+	  } else if (active_cards.length > 0) {
+	  pool = flashcards.filter(f => active_cards.includes(f.char)); // ✅ FIX
+	} else {
+	  pool = flashcards.filter(f => !memorized.has(f.char));
+	}
+	  const charElem = document.getElementById('cardFront');
+	  if (pool.length === 0) {
+	    updateProgress(); // ✅ ensure medals update before returning
+	    charElem.innerText = '🎓';
+	    charElem.style.color = 'black';
+	    document.getElementById('progress').innerText = 'Congratulations! You have completed this list!';
+	    return;
+	  }
+	  previousChar = currentChar;
+	  const selectedCard = pool[Math.floor(Math.random() * pool.length)];
+	  currentChar = selectedCard.char;
+	  currentAnswer = selectedCard.answer;
+		
+	// Handle card back based on listType
+	if (listType.toLowerCase() === 'verbal') {
+	  document.getElementById('cardBack').innerText = ''; // no back for verbal
+	} 
+	else if (listType.toLowerCase() === 'textual') {
+	  document.getElementById('cardBack').innerText = currentAnswer;
+	} 
+	else if (listType.toLowerCase() === 'pictorial') {
+	  document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+	}
+		
+	//testing
+	//console.log("Flashcards:", flashcards);
+	//console.log("Active cards:", active_cards);
+	//console.log("Pick pool:", pool);
+	//console.log("Selected card:", selectedCard);
+		
+	  document.getElementById('cardFront').innerText = currentChar;
+	  const frontElem = document.getElementById('cardFront');
+	  if (listType.toLowerCase() === 'verbal') {
+	    frontElem.style.fontSize = '120px';  // Single characters remain big
+	  } else {
+	    frontElem.style.fontSize = '64px';   // Fits words/math properly
+	  }
+	/* handle spanning text
+	  document.querySelector('#cardFront span').innerText = currentChar;
+	
+	  if (listType.toLowerCase() === 'textual') {
+	    document.querySelector('#cardBack span').innerText = currentAnswer;
+	  } else if (listType.toLowerCase() === 'pictorial') {
+	    document.querySelector('#cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+	  } else {
+	    document.querySelector('#cardBack span').innerText = '';
+	  }
+	*/
+	  const speakBtn = document.getElementById('speak');
+	  if (listType.toLowerCase() === 'verbal') {
+	    speakBtn.innerText = '🔊 Speak';
+	    document.getElementById('cardBack').innerText = ''; // no back
+	  } else if (listType.toLowerCase() === 'textual') {
+	    speakBtn.innerText = '🔄 Flip';
+	    document.getElementById('cardBack').innerText = currentAnswer;
+	  } else if (listType.toLowerCase() === 'pictorial') {
+	    speakBtn.innerText = '🔄 Flip';
+	    document.getElementById('cardBack').innerHTML = `<img src="${currentAnswer}" style="max-width:100%; max-height:100%;">`;
+	  }
+		
+	  let correctTotal = 0;
+	  let totalTotal = 0;
+	  for (const date in history) {
+	    if (history[date][currentChar]) {
+	      correctTotal += history[date][currentChar].correct;
+	      totalTotal += history[date][currentChar].total;
+	    }
+	  }
+	  let color = 'black';
+	  if (totalTotal > 0) {
+	    if (correctTotal === totalTotal) color = 'green';
+	    else if (correctTotal === 0) color = 'red';
+	    else color = 'blue';
+	  }
+	  charElem.style.color = color;
+	  updateProgress();
+  }, 400); 
 }
 
 function recordDaily(char, correct) {
+  if (!selectedList) return;
   checkDailyThreshold();
   const date = today();
   if (!history[date]) history[date] = {};
   if (!history[date][char]) history[date][char] = { correct: 0, total: 0 };
   history[date][char].total++;
   if (correct) history[date][char].correct++;
-  localStorage.setItem('history', JSON.stringify(history));
+  localStorage.setItem(historyKey, JSON.stringify(history));
 }
 
 function undoLastAction() {
+  if (!selectedList) return;
   if (!lastAction || !previousChar) return;
   const { char, correct } = lastAction;
   const oldValue = progress[char] || 0;
@@ -363,18 +592,18 @@ function undoLastAction() {
     if (correct) history[date][char].correct--;
     if (history[date][char].total <= 0) delete history[date][char];
   }
-  localStorage.setItem('progress', JSON.stringify(progress));
+  localStorage.setItem(progressKey, JSON.stringify(progress));
   if (oldValue < 5 && progress[currentChar] >= 5) {
     const sound = document.getElementById('celebrateSound');
     if (sound) sound.play();
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
-  localStorage.setItem('history', JSON.stringify(history));
+  localStorage.setItem(historyKey, JSON.stringify(history));
   memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
   currentChar = previousChar;
   previousChar = null;
   lastAction = null;
-  const charElem = document.getElementById('character');
+  const charElem = document.getElementById('cardFront');
   charElem.innerText = currentChar;
 
   let correctTotal = 0;
@@ -397,8 +626,9 @@ function undoLastAction() {
 function speakChar(c) {
   const audio = new Audio(`audio/${c}.mp3`);
   audio.onerror = () => {
+	const ttsLang = localStorage.getItem(languageKey) || 'en-US';
     const utter = new SpeechSynthesisUtterance(c);
-    utter.lang = 'zh-CN';
+    utter.lang = ttsLang;
     window.speechSynthesis.speak(utter);
   };
   audio.play();
@@ -406,13 +636,21 @@ function speakChar(c) {
 
 document.getElementById('correct').addEventListener('click', () => {
   const oldValue = progress[currentChar] || 0;
-  //const oldValue = progress[currentChar] || 0;
   progress[currentChar] = oldValue + 1;
   if (oldValue < 5 && progress[currentChar] >= 5) {
+    memorized.add(currentChar);
+    // Remove from active_cards
+    active_cards = active_cards.filter(c => c !== currentChar);
+    // Add a new one from the non-active pool if available
+    const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5) && !active_cards.includes(c));
+    if (notMemorized.length > 0 && active_cards.length < ACTIVE_CARD_LIMIT) {
+      active_cards.push(notMemorized[0]); // add next card
+    }
+    localStorage.setItem(activeCardsKey, JSON.stringify(active_cards));
     alert(`🎉 Great job! You have now memorized '${currentChar}'! Total memorized: ${Object.values(progress).filter(v => v >= 5).length}`);
   }
-  if (progress[currentChar] >= 5) memorized.add(currentChar);
-  localStorage.setItem('progress', JSON.stringify(progress));
+
+  localStorage.setItem(progressKey, JSON.stringify(progress));
   recordDaily(currentChar, true);
   lastAction = { char: currentChar, correct: true };
   pickNextChar();
@@ -425,7 +663,13 @@ document.getElementById('incorrect').addEventListener('click', () => {
 });
 
 document.getElementById('undoBtn').addEventListener('click', undoLastAction);
-document.getElementById('speak').addEventListener('click', () => speakChar(currentChar));
+document.getElementById('speak').addEventListener('click', () => {
+  if (listType.toLowerCase() === 'verbal') {
+    speakChar(currentChar);
+  } else {
+    document.getElementById('card').classList.toggle('flipped');
+  }
+});
 document.getElementById('reviewBtn').addEventListener('click', () => {
   reviewMode = !reviewMode;
   document.getElementById('reviewBtn').innerText = reviewMode ? '📘 Normal Studying' : '🔁 Review Mode';
@@ -442,58 +686,299 @@ function checkDailyThreshold() {
     }
   }
   if (total === 50 && !localStorage.getItem('dailyPopupShown')) {
-    alert('🎉 You have practiced 50 characters today! Great job!');
+    alert('🎉 You have practiced 50 flash cards today! Great job!');
     localStorage.setItem('dailyPopupShown', 'true');
   }
 }
 
 function exportProgress() {
+  if (!selectedList) {
+    alert("Please select a vocabulary list before exporting.");
+    return;
+  }
+
+  const prefix = selectedList.replace('.csv', '');
   const data = {
-    progress,
-    history,
-    medals: JSON.parse(localStorage.getItem('medals') || '{}'),
+    listName: prefix, // ✅ store the list name inside the file
+    progress: JSON.parse(localStorage.getItem(progressKey) || '{}'),
+    history: JSON.parse(localStorage.getItem(historyKey) || '{}'),
+    medals: JSON.parse(localStorage.getItem(medalsKey) || '{}'),
+    active_cards: JSON.parse(localStorage.getItem(activeCardsKey) || '[]'),
   };
+
   const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
   const url = URL.createObjectURL(blob);
   const a = document.createElement('a');
   a.href = url;
-  a.download = 'progress_backup.json';
+  a.download = `${prefix}_progress_backup.json`;
   a.click();
   URL.revokeObjectURL(url);
 }
 
 function importProgress(evt) {
+  if (!selectedList) {
+    alert("Please select a vocabulary list before importing.");
+    evt.target.value = ""; // reset file input
+    return;
+  }
+
+  const prefix = selectedList.replace('.csv', '');
   const file = evt.target.files[0];
   if (!file) return;
+
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const data = JSON.parse(e.target.result);
-      if (data.progress) localStorage.setItem('progress', JSON.stringify(data.progress));
-      if (data.history) localStorage.setItem('history', JSON.stringify(data.history));
-      if (data.medals) localStorage.setItem('medals', JSON.stringify(data.medals));
-      alert('✅ Progress successfully imported.');
+	    
+      // ✅ Validate the list name
+      if (!data.listName || data.listName !== prefix) {
+        alert(`❌ This progress file is for "${data.listName || 'UNKNOWN'}", but you selected "${prefix}".`);
+        return;
+      }
+	    
+      // Import progress    
+      if (data.progress) localStorage.setItem(progressKey, JSON.stringify(data.progress));
+      if (data.history) localStorage.setItem(historyKey, JSON.stringify(data.history));
+      if (data.medals) localStorage.setItem(medalsKey, JSON.stringify(data.medals));
+      if (data.active_cards) localStorage.setItem(activeCardsKey, JSON.stringify(data.active_cards));
+
+      alert(`✅ Progress for ${prefix} successfully imported.`);
       location.reload();
     } catch (e) {
-      alert('❌ Failed to import progress.');
+      alert('❌ Failed to import progress. Invalid file format.');
     }
   };
   reader.readAsText(file);
+  evt.target.value = ""; // reset file input for subsequent imports
 }
 
+function selectVocabularyList(fileName) {
+  selectedList = fileName;
+  localStorage.setItem("selectedList", selectedList);
+
+  prefix = selectedList.replace('.csv','');
+  progressKey = `${prefix}_progress`;
+  historyKey = `${prefix}_history`;
+  medalsKey = `${prefix}_medals`;
+  activeCardsKey = `${prefix}_activeCards`;
+  languageKey  = `${prefix}_language`;
+
+  document.getElementById('listNameDisplay').innerText = prefix; // Show the list name
+	
+  // Reset if data doesn't exist or if list has changed
+  progress = JSON.parse(localStorage.getItem(progressKey) || '{}');
+  history = JSON.parse(localStorage.getItem(historyKey) || '{}');
+  memorized = new Set(Object.keys(progress).filter(k => progress[k] >= 5));
+  active_cards = JSON.parse(localStorage.getItem(activeCardsKey) || '[]');
+
+  medals = JSON.parse(localStorage.getItem(medalsKey) || '{}');
+  if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.bronze) {medals.bronze = false;}
+  if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.silver) {medals.silver = false;}
+  if (progress && Object.values(progress).filter(v => v >= 5).length < medalThresholds.gold) {medals.gold = false;}
+	
+  // If empty, rebuild the initial active_cards
+  if (active_cards.length === 0) {
+    const notMemorized = flashcards.map(f => f.char).filter(c => !(progress[c] >= 5));
+    active_cards = notMemorized.slice(0, ACTIVE_CARD_LIMIT);
+  }
+
+  localStorage.setItem(activeCardsKey, JSON.stringify(active_cards))
+	
+	
+  currentChar = null;
+  lastAction = null;
+  previousChar = null;
+  reviewMode = false;
+
+  //enable buttons
+  ["correct", "incorrect", "undoBtn", "speak"].forEach(id => {
+  const btn = document.getElementById(id);
+  btn.disabled = false;
+  btn.style.opacity = 1;
+  });
+	
+  // Rewire storage functions to scoped keys
+  updateStorage = () => {
+    localStorage.setItem(progressKey, JSON.stringify(progress));
+    localStorage.setItem(historyKey, JSON.stringify(history));
+  };
+
+  // Reset medal display
+  document.getElementById('bronze').classList.remove('show');
+  document.getElementById('silver').classList.remove('show');
+  document.getElementById('gold').classList.remove('show');
+  updateProgress();
+
+  document.getElementById("progressBtn").disabled = false;
+  document.getElementById("progressBtn").style.opacity = 1;
+  document.getElementById('progress').innerText = ''; // ✅ reset "Congratulations" message
+
+  loadCharactersFromCSV(fileName);
+  document.getElementById('listModal').style.display = 'none';
+}
+	
 document.getElementById('importFile').addEventListener('change', importProgress);
   
 document.getElementById('resetBtn').addEventListener('click', () => {
   if (confirm('Are you sure you want to reset all progress?')) {
-    localStorage.removeItem('progress');
-    localStorage.removeItem('history');
-    localStorage.removeItem('medals');
+    localStorage.removeItem(progressKey);
+    localStorage.removeItem(historyKey);
+    localStorage.removeItem(medalsKey);
     localStorage.removeItem('dailyPopupShown');
     location.reload();
   }
 });
 
-window.onload = loadCharactersFromCSV;
+window.onload = async () => {
+  availableLists = await fetchAvailableLists();
+  document.getElementById("progressBtn").disabled = true;
+  document.getElementById("progressBtn").style.opacity = 0.5;
+  document.getElementById("cardFront").innerText = "📘 Please select a list.";
+  document.getElementById("cardBack").innerText = "";
+
+  ["correct", "incorrect", "undoBtn", "speak"].forEach(id => {
+  const btn = document.getElementById(id);
+  btn.disabled = true;
+  btn.style.opacity = 0.5;
+  });
+};
+
+
+if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = false;
+  recognition.lang = currentLanguage;
+
+  recognition.onstart = () => {
+	console.log('[SpeechRecognition] STARTED. Lang:', recognition.lang);
+    recognizing = true;
+    document.getElementById('micStatus').innerText = 'Listening...';
+    document.getElementById('micIcon').innerText = '🛑';
+  };
+  recognition.onend = () => {
+	console.log('[SpeechRecognition] ENDED.');
+    recognizing = false;
+    document.getElementById('micStatus').innerText = '';
+    document.getElementById('micIcon').innerText = '🎤';
+  };
+  recognition.onnomatch = () => {
+    document.getElementById('micResult').textContent = 'Didn’t catch that—try again closer to the mic.';
+  };
+  recognition.onerror = (e) => {
+	console.log('[SpeechRecognition] ERROR:', e.error);
+    document.getElementById('micStatus').innerText = 'Error: ' + e.error;
+    recognizing = false;
+    document.getElementById('micIcon').innerText = '🎤';
+	try { recognition.abort(); } catch {}
+  };
+  recognition.onresult = function(event) {
+
+    console.log('[SpeechRecognition] RESULT:', event);
+    let results = event.results[event.resultIndex];
+    let userSaidArr = [];
+    let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
+	  
+    const norm = s => s.normalize('NFKC')
+    .trim()
+    .toLowerCase()
+    .replace(/[.,?!，。！？\s]/g,''); // strip spaces too
+
+    const expected = norm(answer);
+    const isChinese = (localStorage.getItem(languageKey) || '').toLowerCase().startsWith('zh');
+
+    // Gather alternatives with confidence
+    for (let i = 0; i < results.length; i++) {
+      let transcript = results[i].transcript.trim().toLowerCase();
+      let confidence = results[i].confidence;
+      userSaidArr.push({ transcript, confidence });
+    }
+
+    // Display all guesses for debugging
+    let debugStr = userSaidArr.map(r => `"${norm(r.transcript)}" (${(r.confidence*100).toFixed(1)}%)`).join(", ");
+    document.getElementById('micResult').innerHTML = `You said: ${debugStr}`;
+
+    // Check if any transcript matches the answer at >=90% confidence
+    let correct = userSaidArr.some(r => {
+      const said = norm(r.transcript);
+      if (isChinese) {
+        // ignore confidence for zh
+        return said === expected;
+      } else {
+        return (said === expected) && (r.confidence >= 0.5);
+      }
+    });
+
+    showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
+  };
+} else {
+  document.getElementById('micBtn').style.display = 'none';
+  document.getElementById('micStatus').innerText = 'Speech Recognition not supported';
+}
+
+document.getElementById('micBtn').addEventListener('click', function() {
+  if (!recognition) return;
+	document.getElementById('micResult').innerText = '';
+    recognition.lang = localStorage.getItem(languageKey) || 'en-US';
+	recognition.maxAlternatives = 1;            // get more guesses
+	recognition.interimResults = false;         // only finals
+  if (!recognizing) {
+    recognition.start();
+  } else {
+    recognition.stop();
+  }
+});
+	
+function showSpeechResult(correct, userResult, answer) {
+  if (correct) {
+    document.getElementById('micResult').innerHTML += ' <span style="color:green;font-size:24px;">✔️</span>';
+    setTimeout(() => {
+      document.getElementById('correct').click();
+    }, 1000);
+  } else {
+    document.getElementById('micResult').innerHTML += ' <span style="color:red;font-size:24px;">❌</span>';
+    if (answerCheckMode === 'verbal') {
+      setTimeout(() => speakChar(answer), 1200);
+    } else {
+      setTimeout(() => {
+        document.getElementById('card').classList.add('flipped');
+        speakChar(answer);
+      }, 1200);
+    }
+  }
+}	
+	
+document.getElementById('listSelectBtn').addEventListener('click', () => {
+  const listEl = document.getElementById('listOptions');
+  listEl.innerHTML = '';
+  availableLists.forEach(file => {
+    const prefix = file.replace('.csv', '');
+    const medals = JSON.parse(localStorage.getItem(`${prefix}_medals`) || '{}');
+    const li = document.createElement('li');
+    const btn = document.createElement('button');
+    btn.innerText = file.replace('.csv', '');
+    btn.style.margin = '5px';
+    btn.onclick = () => selectVocabularyList(file);
+    li.appendChild(btn);
+
+    // ✅ Medal display (show all earned medals)
+    const medalSpan = document.createElement('span');
+    medalSpan.style.marginLeft = '10px';
+
+    if (medals.bronze) medalSpan.textContent += '🥉 ';
+    if (medals.silver) medalSpan.textContent += '🥈 ';
+    if (medals.gold) medalSpan.textContent += '🥇';
+
+    if (!medalSpan.textContent.trim()) medalSpan.textContent = '⬜'; // no medals earned
+
+    li.appendChild(medalSpan);
+    listEl.appendChild(li);
+  });
+  document.getElementById('listModal').style.display = 'block';
+});
+	
 </script>
 </body>
 </html>
