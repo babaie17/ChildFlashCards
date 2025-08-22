@@ -28,7 +28,7 @@ Chinese tone policy:
 - If language starts with zh and target is a single Hanzi: base pinyin match = pass=true.
 - Wrong tone => tone.match=false and deduct ~0.10 from score.
 - tone object: {"expected":"1|2|3|4|5|null","heard":"1|2|3|4|5|null","match":boolean}.
-Hints: <= 80 chars, actionable.
+Hints: If score<0.95, include a short, kind, actionable hint (<=80 chars), e.g. “Try rising tone (2)”, “Hold the final n”.
 - pass for anything above or equal to 0.7`;
 
     const user = {
