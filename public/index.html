@@ -1019,8 +1019,17 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 		  const lang = localStorage.getItem(languageKey) || currentLanguage || 'en-US';
 		
 		  // ---- Judge-only path (ASR + LLM in one round trip) ----
-		  const verdict = await gradeBlob(blob, expected, lang, speechProvider);
-		
+		  //const verdict = await gradeBlob(blob, expected, lang, speechProvider); --> does ASR, then AI
+		  	const verdict = await fetch('/api/grade_direct', {
+			  method: 'POST',
+			  body: (() => {
+			    const f = new FormData();
+			    f.append('audio', blob, guessName(blob.type));
+			    f.append('expected', expected);
+			    f.append('language', currentLanguage || 'en-US');
+			    return f;
+			  })()
+			}).then(r => r.json());
 		  // Show feedback line
 		  const top = verdict.transcriptTop || '(no result)';
 		  const toneTxt = verdict.tone && verdict.tone.expected != null
