@@ -648,6 +648,15 @@ function speakChar(c) {
   audio.play();
 }
 
+function guessName(mime) {
+  const t = (mime || '').toLowerCase();
+  if (t.includes('webm')) return 'clip.webm';
+  if (t.includes('ogg'))  return 'clip.ogg';
+  if (t.includes('wav'))  return 'clip.wav';
+  if (t.includes('mp3'))  return 'clip.mp3';
+  return 'clip.wav';
+}
+	
 document.getElementById('correct').addEventListener('click', () => {
   const oldValue = progress[currentChar] || 0;
   progress[currentChar] = oldValue + 1;
