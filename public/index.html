@@ -152,6 +152,7 @@
 <div id="listNameDisplay" style="position:absolute; top:10px; left:50%; transform:translateX(-50%); font-size:40px; font-weight:bold;">
 </div>
 <div class="top-bar">
+	<button id="settingsBtn" style="background:#455A64; color:white;">⚙️ Settings</button>
     <button id="listSelectBtn" style="background:#607d8b; color:white;">📂 Select List</button>
     <button id="progressBtn">📊 Progress</button>
     <button id="reviewBtn">🔁 Review Mode</button>
@@ -190,6 +191,19 @@
 </div>
 <input type="file" id="importFile" style="display:none" />
 <button id="resetBtn" style="position:fixed; bottom:20px; right:20px; padding:10px 20px; background:#e91e63; color:white; border:none; border-radius:8px; font-size:16px; cursor:pointer; min-width:180px;">Reset Progress</button>
+
+<div id="settingsModal" style="display:none; position:fixed; top:20%; right:10%; width:300px; background:white; color:#111; border:2px solid #333; border-radius:10px; z-index:200; padding:16px;">
+  <h3 style="margin-top:0">Settings</h3>
+  <label style="display:block; margin:10px 0 6px;">Speech provider</label>
+  <select id="providerSelect" style="width:100%; padding:6px 8px;">
+    <option value="openai">OpenAI (default)</option>
+    <option value="azure">Azure</option>
+  </select>
+  <div style="display:flex; gap:8px; justify-content:flex-end; margin-top:14px;">
+    <button id="settingsClose">Close</button>
+    <button id="settingsSave" style="background:#2196f3; color:#fff;">Save</button>
+  </div>
+</div>
 
 <script>
 //let characters = [];
@@ -844,90 +858,156 @@ window.onload = async () => {
   });
 };
 
+// ==== Cloud speech settings (persisted) ====
+const PROVIDER_KEY = 'speechProvider';
+let speechProvider = localStorage.getItem(PROVIDER_KEY) || 'openai'; // default to OpenAI
 
-if ('webkitSpeechRecognition' in window || 'SpeechRecognition' in window) {
-  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-  recognition = new SpeechRecognition();
-  recognition.continuous = false;
-  recognition.interimResults = false;
-  recognition.lang = currentLanguage;
+// Wire the Settings popup
+const settingsBtn   = document.getElementById('settingsBtn');
+const settingsModal = document.getElementById('settingsModal');
+const providerSel   = document.getElementById('providerSelect');
+const settingsClose = document.getElementById('settingsClose');
+const settingsSave  = document.getElementById('settingsSave');
 
-  recognition.onstart = () => {
-	console.log('[SpeechRecognition] STARTED. Lang:', recognition.lang);
-    recognizing = true;
-    document.getElementById('micStatus').innerText = 'Listening...';
-    document.getElementById('micIcon').innerText = '🛑';
-  };
-  recognition.onend = () => {
-	console.log('[SpeechRecognition] ENDED.');
-    recognizing = false;
-    document.getElementById('micStatus').innerText = '';
-    document.getElementById('micIcon').innerText = '🎤';
-  };
-  recognition.onnomatch = () => {
-    document.getElementById('micResult').textContent = 'Didn’t catch that—try again closer to the mic.';
-  };
-  recognition.onerror = (e) => {
-	console.log('[SpeechRecognition] ERROR:', e.error);
-    document.getElementById('micStatus').innerText = 'Error: ' + e.error;
-    recognizing = false;
-    document.getElementById('micIcon').innerText = '🎤';
-	try { recognition.abort(); } catch {}
-  };
-  recognition.onresult = function(event) {
+providerSel.value = speechProvider;
 
-    console.log('[SpeechRecognition] RESULT:', event);
-    let results = event.results[event.resultIndex];
-    let userSaidArr = [];
-    let answer = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
-	  
-    const norm = s => s.normalize('NFKC')
-    .trim()
-    .toLowerCase()
-    .replace(/[.,?!，。！？\s]/g,''); // strip spaces too
+settingsBtn.addEventListener('click', () => { settingsModal.style.display = 'block'; });
+settingsClose.addEventListener('click', () => { settingsModal.style.display = 'none'; });
+settingsSave.addEventListener('click', () => {
+  speechProvider = providerSel.value;
+  localStorage.setItem(PROVIDER_KEY, speechProvider);
+  settingsModal.style.display = 'none';
+});
 
-    const expected = norm(answer);
-    const isChinese = (localStorage.getItem(languageKey) || '').toLowerCase().startsWith('zh');
+// ==== Mic recording via MediaRecorder ====
+let mediaRecorder = null;
+let recChunks = [];
+let recActive = false;
 
-    // Gather alternatives with confidence
-    for (let i = 0; i < results.length; i++) {
-      let transcript = results[i].transcript.trim().toLowerCase();
-      let confidence = results[i].confidence;
-      userSaidArr.push({ transcript, confidence });
-    }
-
-    // Display all guesses for debugging
-    let debugStr = userSaidArr.map(r => `"${norm(r.transcript)}" (${(r.confidence*100).toFixed(1)}%)`).join(", ");
-    document.getElementById('micResult').innerHTML = `You said: ${debugStr}`;
-
-    // Check if any transcript matches the answer at >=90% confidence
-    let correct = userSaidArr.some(r => {
-      const said = norm(r.transcript);
-      if (isChinese) {
-        // ignore confidence for zh
-        return said === expected;
-      } else {
-        return (said === expected) && (r.confidence >= 0.5);
-      }
-    });
-
-    showSpeechResult(correct, userSaidArr[0]?.transcript || '', answer);
-  };
-} else {
-  document.getElementById('micBtn').style.display = 'none';
-  document.getElementById('micStatus').innerText = 'Speech Recognition not supported';
+function setMicUI(on, msg='') {
+  recActive = on;
+  document.getElementById('micIcon').textContent = on ? '🛑' : '🎤';
+  document.getElementById('micStatus').textContent = msg;
 }
 
-document.getElementById('micBtn').addEventListener('click', function() {
-  if (!recognition) return;
-	document.getElementById('micResult').innerText = '';
-    recognition.lang = localStorage.getItem(languageKey) || 'en-US';
-	recognition.maxAlternatives = 1;            // get more guesses
-	recognition.interimResults = false;         // only finals
-  if (!recognizing) {
-    recognition.start();
-  } else {
-    recognition.stop();
+async function startRecording() {
+  const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  recChunks = [];
+
+  // Choose MIME per provider (both backends accept opus; OpenAI is best with webm/ogg)
+  let mime = '';
+  if (speechProvider === 'openai') {
+    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus';
+    else if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) mime = 'audio/ogg;codecs=opus';
+  } else { // azure
+    if (MediaRecorder.isTypeSupported('audio/ogg;codecs=opus')) mime = 'audio/ogg;codecs=opus';
+    else if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) mime = 'audio/webm;codecs=opus';
+  }
+
+  mediaRecorder = new MediaRecorder(stream, mime ? { mimeType: mime } : undefined);
+  mediaRecorder.ondataavailable = e => { if (e.data && e.data.size) recChunks.push(e.data); };
+  mediaRecorder.onstart = () => setMicUI(true, 'Listening…');
+  mediaRecorder.start();
+}
+
+function stopRecording() {
+  return new Promise(resolve => {
+    if (!mediaRecorder) return resolve(null);
+    mediaRecorder.onstop = () => {
+      const type = recChunks[0]?.type || 'application/octet-stream';
+      const blob = new Blob(recChunks, { type });
+      resolve(blob);
+    };
+    mediaRecorder.stop();
+    setMicUI(false, '');
+  });
+}
+
+// Normalize: remove spaces/punct, case-fold for matching
+const norm = s => (s || '')
+  .normalize('NFKC')
+  .trim()
+  .toLowerCase()
+  .replace(/[.,?!，。！？\s]/g,'');
+
+// Send to your Edge function
+async function transcribeBlob(audioBlob) {
+  const form = new FormData();
+  form.append('audio', audioBlob, audioBlob.type.includes('webm') ? 'clip.webm' :
+                               audioBlob.type.includes('ogg')  ? 'clip.ogg'  :
+                               audioBlob.type.includes('wav')  ? 'clip.wav'  :
+                                                                 'clip.bin');
+  // use list language (set earlier by your CSV loader)
+  const lang = localStorage.getItem(languageKey) || currentLanguage || 'en-US';
+  form.append('language', lang);
+  form.append('provider', speechProvider);
+
+  const r = await fetch('/api/transcribe', { method: 'POST', body: form });
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    const t = await r.text();
+    throw new Error(t || `HTTP ${r.status}`);
+  }
+  const data = await r.json();
+  if (!r.ok || data.error) {
+    throw new Error(data.error || 'Transcribe error');
+  }
+  return data; // { candidates:[], zhAugment?, enHomophones? }
+}
+
+// Merge all possible strings we should accept as “spoken”
+function collectAllSpokenStrings(apiData) {
+  const out = new Set();
+
+  // main candidates
+  (apiData.candidates || []).forEach(s => { if (s) out.add(s); });
+
+  // English alternates (digits/words + Datamuse)
+  if (apiData.enHomophones && Array.isArray(apiData.enHomophones.homophones)) {
+    apiData.enHomophones.homophones.forEach(s => { if (s) out.add(s); });
+  }
+
+  // Chinese: if we prompted a single character or pinyin, we get a homophone list of hanzi
+  if (apiData.zhAugment && Array.isArray(apiData.zhAugment.homophones)) {
+    apiData.zhAugment.homophones.forEach(s => { if (s) out.add(s); });
+  }
+
+  // return normalized list for comparison
+  return Array.from(out).map(norm);
+}
+
+// Replace mic button handler with cloud flow
+document.getElementById('micBtn').addEventListener('click', async () => {
+  try {
+    document.getElementById('micResult').textContent = '';
+
+    if (!recActive) {
+      await startRecording();
+    } else {
+      setMicUI(false, 'Processing…');
+      const blob = await stopRecording();
+      if (!blob) { setMicUI(false, ''); return; }
+
+      const data = await transcribeBlob(blob);
+      // Show top candidate for user feedback
+      const top = (data.candidates && data.candidates[0]) ? data.candidates[0] : '(no result)';
+      document.getElementById('micResult').textContent = `You said: ${top}`;
+
+      // Build the accept set
+      const spokenSet = new Set(collectAllSpokenStrings(data));
+
+      // Expected “answer” per your existing logic
+      const expected = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
+
+      // Compare normalized
+      const ok = spokenSet.has(norm(expected));
+
+      showSpeechResult(ok, top, expected);
+    }
+  } catch (err) {
+    console.error(err);
+    setMicUI(false, 'Error');
+    document.getElementById('micResult').textContent = 'Speech error — try again.';
   }
 });
 	
