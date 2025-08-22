@@ -966,6 +966,7 @@ async function gradeBlob(audioBlob, expected, language, provider) {
   form.append('expected', expected);
   form.append('language', language);
   form.append('provider', provider || 'openai'); // default: OpenAI
+  form.append('evidence', 'none'); // keep latency low
 
   const r = await fetch('/api/grade', { method:'POST', body: form });
   const ct = r.headers.get('content-type') || '';
