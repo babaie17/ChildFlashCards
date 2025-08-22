@@ -1,0 +1,9 @@
+{
+  "name": "speech-backend",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "number-to-words": "^1.2.4",
+    "words-to-numbers": "^1.5.1"
+  }
+}
