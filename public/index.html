@@ -964,6 +964,24 @@ async function transcribeBlob(audioBlob) {
   return data; // { candidates:[], zhAugment?, enHomophones? }
 }
 
+async function assessBlob(blob, expected, language) {
+  const f = new FormData();
+  f.append('audio',
+    blob,
+    blob.type.includes('webm') ? 'clip.webm' :
+    blob.type.includes('ogg')  ? 'clip.ogg'  :
+    blob.type.includes('mp3')  ? 'clip.mp3'  : 'clip.wav'
+  );
+  f.append('expected', expected);
+  f.append('language', language || 'en-US');
+
+  const r = await fetch('/api/assess', { method: 'POST', body: f });
+  const ct = r.headers.get('content-type') || '';
+  const data = ct.includes('application/json') ? await r.json() : { error: await r.text() };
+  if (data.error) throw new Error(data.error);
+  return data; // { pass, score, tone?, hint?, provider: 'azure-assess' }
+}
+	
 async function gradeBlob(audioBlob, expected, language, provider) {
   const form = new FormData();
   form.append('audio',
@@ -1026,7 +1044,8 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 		  // Determine target answer the same way you already do
 		  const expected = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
 		  const lang = localStorage.getItem(languageKey) || currentLanguage || 'en-US';
-		
+
+			/* openai start
 		  // ---- Judge-only path (ASR + LLM in one round trip) ----
 		  //const verdict = await gradeBlob(blob, expected, lang, speechProvider); --> does ASR, then AI
 		  	const verdict = await (async () => {
@@ -1060,9 +1079,14 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 		
 		  // Log timings for latency measurement
 		  if (verdict.timings) console.log('[grade timings]', verdict.timings);
-		
+		 ----openAI end	*/
 		  // Drive your existing correct/incorrect flow
-		  showSpeechResult(verdict.pass, top, expected);
+			// In your mic stop handler:
+			const res = await assessBlob(blob, expected, currentLanguage);
+			showSpeechResult(res.pass, '', expected);  // keep your existing UI hooks
+			if (!res.pass && res.hint) showHint(res.hint);
+			console.log('[assess]', res);
+		  //showSpeechResult(verdict.pass, top, expected);
 		
 		  // ---- Old local matcher (kept for future use; disabled) ----
 		  /*
