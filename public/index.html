@@ -1065,11 +1065,12 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 		  showSpeechResult(ok, topOld, expected);
 		  */
 		}
-  } catch (err) {
-    console.error(err);
-    setMicUI(false, 'Error');
-    document.getElementById('micResult').textContent = 'Speech error — try again.';
-  }
+	 } catch (err) {
+	  console.error(err);
+	  setMicUI(false, 'Error');
+	  const msg = (err && err.message) ? String(err.message) : 'Speech error';
+	  document.getElementById('micResult').textContent = `Speech error — ${msg}`;
+	}
 });
 	
 function showSpeechResult(correct, userResult, answer) {
