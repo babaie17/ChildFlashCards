@@ -16,6 +16,7 @@ export default async function handler(request) {
     const expected = (form.get('expected') || '').toString();
     const language = (form.get('language') || 'en-US').toString();
     const provider = (form.get('provider') || 'openai').toString().toLowerCase();
+    const evidenceMode = ((form.get('evidence') || 'none').toString().toLowerCase() === 'full') ? 'full' : 'none';
 
     if (!file || typeof file.arrayBuffer !== 'function') {
       return json({ error: 'No audio uploaded' }, 400);
@@ -98,8 +99,11 @@ export default async function handler(request) {
     const asrMs = Date.now() - asrStart;
 
     // ---------- helper lists (optional evidence for judge) ----------
-    const zhAugment = await buildZhHomophones(request.url, candidates, language);
-    const enHomophones = await buildEnHomophones(candidates, request.url, language);
+    let zhAugment = null, enHomophones = null;
+    if (evidenceMode === 'full') {
+      zhAugment = await buildZhHomophones(request.url, candidates, language);
+      enHomophones = await buildEnHomophones(candidates, request.url, language);
+    }
 
     // ---------- 2) LLM Judge ----------
     const judgeStart = Date.now();
@@ -107,15 +111,28 @@ export default async function handler(request) {
     if (!key) return json({ error: 'OPENAI_API_KEY missing' }, 500);
 
     const sys =
-`You are a strict but kind pronunciation judge for a language learning app.
+`You are a strict but kind pronunciation judge for a flash card app.
 Return STRICT JSON with keys: pass (boolean), score (0..1), tone (object or null), hint (string or null).
 Rules:
 - Consider the target "expected" and language.
 - Use ASR candidates and helper lists as evidence.
 - If language starts with zh, judge by Mandarin pronunciation (pinyin + tone). Be tone-aware if a single Hanzi is expected.
-- If unsure, prefer pass=false and give a short, kind, actionable hint (<=80 chars).
-- score: 1.0 = perfect match; 0.0 = unrelated.
-- tone: { expected: '1|2|3|4|5|null', heard: '1|2|3|4|5|null', match: boolean } or null for non-tonal languages.`;
+Scoring rubric (continuous):
+- 0.95–1.00: clear correct pronunciation of the intended word/character.
+- 0.85–0.94: minor deviation (accent, slight vowel drift) but clearly the intended target.
+- 0.70–0.84: similar but uncertain; could be a close homophone/minor mispronunciation.
+- 0.40–0.69: somewhat related but likely wrong.
+- 0.00–0.39: unrelated.
+Tone policy:
+- If language starts with zh and the target is a single Hanzi, judge by Mandarin pronunciation (pinyin + tone).
+- If base pinyin matches but tone differs, set pass=true (base correctness matters most); include tone={expected,heard,match:false}.
+- Penalize score by ~0.10 for wrong tone (e.g., base match 0.95 -> 0.85).
+Hints:
+- If score<0.95, include a short, kind, actionable hint (<=80 chars), e.g. “Try rising tone (2)”, “Hold the final n”.
+Output:
+- score must be a float in [0,1] (not just 0 or 1).
+- pass for anything above or equal to 0.7
+- tone: { expected: '1|2|3|4|5|null', heard: '1|2|3|4|5|null', match: boolean } or null for non-tonal.`;
 
     const user = {
       language,
@@ -123,8 +140,9 @@ Rules:
       asr: {
         provider: asrProvider,
         candidates,
-        zhAugment,
-        enHomophones
+        // only include evidence if present (evidenceMode === 'full')
+        ...(zhAugment ? { zhAugment } : {}),
+        ...(enHomophones ? { enHomophones } : {})
       }
     };
 
