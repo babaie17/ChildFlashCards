@@ -49,7 +49,7 @@ Hints: If score<0.95, include a short, kind, actionable hint (<=80 chars), e.g. 
       },
       body: JSON.stringify({
         model: 'gpt-4o-audio-preview',   // audio-in capable snapshot; update if docs change
-        response_format: { type: 'json_object' },
+        text: { format: 'json' },
         temperature: 0.2,
         input: [
           { role: 'system', content: sys },
