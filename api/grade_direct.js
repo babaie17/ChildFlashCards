@@ -21,14 +21,15 @@ Return STRICT JSON: { "pass": boolean, "score": number, "tone": object|null, "hi
 Scoring (continuous):
 - 0.95–1.00: clear correct pronunciation of the intended target.
 - 0.85–0.94: minor deviation but clearly correct target.
-- 0.70–0.84: close but uncertain; likely minor mispronunciation.
+- 0.70–0.84: close but uncertain; likely minor mispronunciation, rhyme, consonant off.
 - 0.40–0.69: somewhat related but likely wrong.
 - 0.00–0.39: unrelated.
 Chinese tone policy:
 - If language starts with zh and target is a single Hanzi: base pinyin match = pass=true.
 - Wrong tone => tone.match=false and deduct ~0.10 from score.
 - tone object: {"expected":"1|2|3|4|5|null","heard":"1|2|3|4|5|null","match":boolean}.
-Hints: <= 80 chars, actionable.`;
+Hints: <= 80 chars, actionable.
+- pass for anything above or equal to 0.7`;
 
     const user = {
       language,
