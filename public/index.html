@@ -955,6 +955,31 @@ async function transcribeBlob(audioBlob) {
   return data; // { candidates:[], zhAugment?, enHomophones? }
 }
 
+async function gradeBlob(audioBlob, expected, language, provider) {
+  const form = new FormData();
+  form.append('audio',
+    audioBlob,
+    audioBlob.type.includes('webm') ? 'clip.webm' :
+    audioBlob.type.includes('ogg')  ? 'clip.ogg'  :
+    audioBlob.type.includes('wav')  ? 'clip.wav'  : 'clip.bin'
+  );
+  form.append('expected', expected);
+  form.append('language', language);
+  form.append('provider', provider || 'openai'); // default: OpenAI
+
+  const r = await fetch('/api/grade', { method:'POST', body: form });
+  const ct = r.headers.get('content-type') || '';
+  if (!ct.includes('application/json')) {
+    const t = await r.text();
+    throw new Error(t || `HTTP ${r.status}`);
+  }
+  const data = await r.json();
+  if (!r.ok || data.error) {
+    throw new Error(data.error || 'Grade error');
+  }
+  return data; // { pass, score, tone, hint, transcriptTop, candidates, timings, ... }
+}
+	
 // Merge all possible strings we should accept as “spoken”
 function collectAllSpokenStrings(apiData) {
   const out = new Set();
@@ -984,26 +1009,46 @@ document.getElementById('micBtn').addEventListener('click', async () => {
     if (!recActive) {
       await startRecording();
     } else {
-      setMicUI(false, 'Processing…');
-      const blob = await stopRecording();
-      if (!blob) { setMicUI(false, ''); return; }
-
-      const data = await transcribeBlob(blob);
-      // Show top candidate for user feedback
-      const top = (data.candidates && data.candidates[0]) ? data.candidates[0] : '(no result)';
-      document.getElementById('micResult').textContent = `You said: ${top}`;
-
-      // Build the accept set
-      const spokenSet = new Set(collectAllSpokenStrings(data));
-
-      // Expected “answer” per your existing logic
-      const expected = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
-
-      // Compare normalized
-      const ok = spokenSet.has(norm(expected));
-
-      showSpeechResult(ok, top, expected);
-    }
+		  setMicUI(false, 'Processing…');
+		  const blob = await stopRecording();
+		  if (!blob) { setMicUI(false, ''); return; }
+		
+		  // Determine target answer the same way you already do
+		  const expected = (answerCheckMode === 'verbal') ? currentChar : currentAnswer;
+		  const lang = localStorage.getItem(languageKey) || currentLanguage || 'en-US';
+		
+		  // ---- Judge-only path (ASR + LLM in one round trip) ----
+		  const verdict = await gradeBlob(blob, expected, lang, speechProvider);
+		
+		  // Show feedback line
+		  const top = verdict.transcriptTop || '(no result)';
+		  const toneTxt = verdict.tone && verdict.tone.expected != null
+		    ? ` | tone: expected ${verdict.tone.expected}, heard ${verdict.tone.heard}`
+		    : '';
+		  document.getElementById('micResult').textContent =
+		    `You said: ${top}  | score: ${Number(verdict.score).toFixed(2)}${toneTxt}`;
+		
+		  // Optional: kid-friendly nudge if wrong
+		  if (!verdict.pass && verdict.hint) {
+		    document.getElementById('micResult').textContent += `  —  ${verdict.hint}`;
+		  }
+		
+		  // Log timings for latency measurement
+		  if (verdict.timings) console.log('[grade timings]', verdict.timings);
+		
+		  // Drive your existing correct/incorrect flow
+		  showSpeechResult(verdict.pass, top, expected);
+		
+		  // ---- Old local matcher (kept for future use; disabled) ----
+		  /*
+		  const data = await transcribeBlob(blob);
+		  const topOld = (data.candidates && data.candidates[0]) ? data.candidates[0] : '(no result)';
+		  document.getElementById('micResult').textContent = `You said: ${topOld}`;
+		  const spokenSet = new Set(collectAllSpokenStrings(data));
+		  const ok = spokenSet.has(norm(expected));
+		  showSpeechResult(ok, topOld, expected);
+		  */
+		}
   } catch (err) {
     console.error(err);
     setMicUI(false, 'Error');
