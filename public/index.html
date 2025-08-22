@@ -1020,16 +1020,22 @@ document.getElementById('micBtn').addEventListener('click', async () => {
 		
 		  // ---- Judge-only path (ASR + LLM in one round trip) ----
 		  //const verdict = await gradeBlob(blob, expected, lang, speechProvider); --> does ASR, then AI
-		  	const verdict = await fetch('/api/grade_direct', {
-			  method: 'POST',
-			  body: (() => {
-			    const f = new FormData();
-			    f.append('audio', blob, guessName(blob.type));
-			    f.append('expected', expected);
-			    f.append('language', currentLanguage || 'en-US');
-			    return f;
-			  })()
-			}).then(r => r.json());
+		  	const verdict = await (async () => {
+			  const resp = await fetch('/api/grade_direct', {
+			    method: 'POST',
+			    body: (() => {
+			      const f = new FormData();
+			      f.append('audio', blob, guessName(blob.type));
+			      f.append('expected', expected);
+			      f.append('language', currentLanguage || 'en-US');
+			      return f;
+			    })()
+			  });
+			  const ct = resp.headers.get('content-type') || '';
+			  const data = ct.includes('application/json') ? await resp.json() : { error: await resp.text() };
+			  if (!resp.ok || data.error) throw new Error(data.error || `HTTP ${resp.status}`);
+			  return data;
+			})();
 		  // Show feedback line
 		  const top = verdict.transcriptTop || '(no result)';
 		  const toneTxt = verdict.tone && verdict.tone.expected != null
