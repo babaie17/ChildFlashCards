@@ -657,6 +657,21 @@ function guessName(mime) {
   return 'clip.wav';
 }
 	
+function showHint(msg) {
+  if (!msg) return;
+  // Find or create a hint element in the DOM
+  let hintEl = document.getElementById('speechHint');
+  if (!hintEl) {
+    hintEl = document.createElement('div');
+    hintEl.id = 'speechHint';
+    hintEl.style.marginTop = '8px';
+    hintEl.style.color = '#ffa';
+    hintEl.style.fontSize = '14px';
+    document.querySelector('.wrap')?.appendChild(hintEl);
+  }
+  hintEl.textContent = `💡 Hint: ${msg}`;
+}	
+	
 document.getElementById('correct').addEventListener('click', () => {
   const oldValue = progress[currentChar] || 0;
   progress[currentChar] = oldValue + 1;
